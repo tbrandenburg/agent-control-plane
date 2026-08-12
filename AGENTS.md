@@ -86,4 +86,24 @@
   `waitForHealth` time out deterministically, not flakily. Verify container→host fixture reachability
   independently (e.g. `docker run --rm --network bridge ... node -e "fetch('http://<gateway>:<port>')"`)
   before trusting a real-Docker integration test's pass/fail as signal about the code under test.
+- The repo-root `workspace/` directory is **load-bearing, not scratch space** — it's
+  `docker-compose.yml`'s default `WORKSPACE_HOST_PATH`, the "pre-cloned, hardcoded repo" Phase 1
+  bind-mounts read-only into every sandbox container at `/workspace/repo` (`sandbox.js`). It's
+  untracked (not in git) and looks like debris on a bare `ls`/`git status`, but deleting it while
+  the stack is running reproduces this repo's own already-documented pitfall live: Docker
+  auto-recreates it as an **empty, root-owned** directory the moment a new sandbox spawns, breaking
+  every session's checked-out repo until fixed. Recoverable without host `sudo` via
+  `docker run --rm -v "$(pwd)/workspace:/fix" alpine chown -R "$(id -u):$(id -g)" /fix` (root-in-
+  container maps to host root by default). Treat any untracked root-level directory referenced by
+  `docker-compose.yml`'s env defaults as production state, not cleanup candidate — check
+  `grep -rn <dirname> docker-compose.yml` before deleting anything that "looks like" a stray folder.
+- `docker compose up`'s host port binding silently defaults when the shell invoking it doesn't have
+  the same `HOST_PORT` the original stack was started with (e.g. a fresh agent/CI shell vs. the
+  interactive shell that ran the initial `docker compose up`) — this reproduced live as a real
+  outage: rebuilding images and restarting via `docker compose up -d --build` in a shell without
+  `HOST_PORT=3001` exported tried to bind the default `3000`, which collided with an unrelated
+  process already on that port, and left `control-plane` down until manually restarted with the
+  correct `HOST_PORT`. Before restarting any already-running compose stack, inspect the live
+  container's actual port mapping first (`docker ps --format '{{.Ports}}'`) and pass it through
+  explicitly, rather than trusting the compose file's own fallback default.
 
