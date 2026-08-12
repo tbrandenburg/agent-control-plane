@@ -170,22 +170,28 @@ design — it solved a problem that doesn't exist (keeping the list fresh) at th
 exist here (only exposing an intentionally-curated subset):
 
 ```js
-// config.js
+// config.js — ids are already provider-qualified (`providerID/modelID`, §8's `splitModel`), and
+// nothing requires them to share one providerID. Entries can span any number of providers/gateways
+// registered in the Platform config repo's opencode.json (see §8's declared correction) — the
+// allowlist's job is curation, not enumerating which gateways exist.
 const MODEL_ALLOWLIST = [
   { id: 'litellm/eu.anthropic.claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
+  // { id: 'openai-direct/gpt-5', name: 'GPT-5 (direct)' },  — a second, differently-gatewayed
+  // example entry; not implemented, illustrating that the shape already supports it today.
   // ... hand-maintained, one entry per approved model
 ]
 
 fastify.get('/api/models', async () => ({ models: MODEL_ALLOWLIST }))
 ```
 
-- **No LiteLLM query, no cache, no `LITELLM_BASE_URL` model-listing dependency** — simpler than the
-  hybrid design previously drafted here, and it's what production actually does.
+- **No live gateway query, no cache, no model-listing dependency on any specific gateway's env vars**
+  — simpler than the hybrid design previously drafted here, and it's what production actually does.
 - Updating the list is a config change + redeploy, same cost as any other static allowlist (§13) —
   acceptable since model approval is inherently a curated, infrequent decision, not something that
-  should auto-follow whatever LiteLLM happens to expose.
-- `LITELLM_BASE_URL`/`/v1/models` still gets used for the actual `provider.litellm` routing in
-  `OPENCODE_CONFIG_CONTENT` (§8) — this only affects the *listing* endpoint, not model invocation.
+  should auto-follow whatever any one gateway happens to expose.
+- This list is independent of whichever provider(s) the Platform config repo or the control plane's
+  own default-fallback layer (§8) actually wire up at runtime — it's UI curation metadata only, never
+  a source of provider connection details.
 
 **The allowlist is UI-only, not a validation gate (confirmed):** `POST /api/sessions`,
 `POST /api/sessions/:id/prompt`, and the WS `prompt` message validate `model` against **syntax only**
@@ -314,40 +320,99 @@ Volume/watchdog note: sandboxes exit on their own — the bridge's idle watchdog
 
 ### Config layering
 
-`opencode` resolves config natively from (lowest → highest): remote config → global config →
-`OPENCODE_CONFIG` (file path) → project `opencode.json`/`.opencode/` → `OPENCODE_CONFIG_DIR` →
-`OPENCODE_CONFIG_CONTENT` (inline JSON) → managed/MDM config. **No custom *merge-algorithm* logic is
-required** — opencode resolves layer precedence natively.
+**Corrected against opencode's own documented precedence chain (Context7 `/anomalyco/opencode`,
+`config.mdx`), which is 8 steps, not the 3+1 shape earlier drafts of this section implied** (lowest →
+highest, later overrides earlier):
 
-**Precision correction:** this is *not* "purely opencode's native resolution end-to-end," and the
-dev's feedback is right to flag that distinction — the bootstrap/supervisor layer (below) explicitly
-**composes** which directory trees exist at which paths (via cloning/mounting) and **overwrites the
-model selection at runtime** via the non-negotiable `OPENCODE_CONFIG_CONTENT` layer. What's true is
-narrower than "no custom logic": there's no custom *deep-merge algorithm* (opencode's own precedence
-rules do that part), but there *is* real, authored orchestration logic deciding what gets fed into that
-resolution chain in the first place.
+1. **Remote config** (`.well-known/opencode`) — organizational defaults
+2. **Global config** (`~/.config/opencode/opencode.json`) — user preferences
+3. **Custom config** (`OPENCODE_CONFIG` env var — a **file path**, not inline JSON)
+4. **Project config** (`opencode.json` in the target repo)
+5. **`.opencode` directories** (agents, commands, plugins) — includes `OPENCODE_CONFIG_DIR` (team layer)
+6. **Inline config** (`OPENCODE_CONFIG_CONTENT` env var — JSON content, not a path) — runtime overrides
+7. **Managed config files** (macOS admin-controlled) — not applicable to this Linux/Docker deployment
+8. **macOS managed preferences** (MDM) — not applicable here either
 
-`OPENCODE_CONFIG_CONTENT` (set by the control plane at spawn time) is the one non-negotiable fact that
-must survive every override — in practice this is narrow: just `model` (session default), `autoupdate:
-false`, and the `provider.litellm` block routing through the proxy:
+This project's three-layer framing (Platform → Team → Repo) maps onto steps 2/5/4 respectively —
+`PLATFORM_CONFIG_REPO` is sparse-cloned into `~/.config/opencode/` (step 2's actual path), the team
+layer uses `OPENCODE_CONFIG_DIR` (step 5), and the target repo's own `opencode.json` is step 4,
+discovered natively by opencode after cloning. **No custom *merge-algorithm* logic is required** —
+opencode resolves layer precedence natively.
+
+**Precision correction:** this is *not* "purely opencode's native resolution end-to-end" — the
+bootstrap/supervisor layer (below) explicitly **composes** which directory trees exist at which paths
+(via cloning/mounting) and **overwrites the model selection at runtime** via `OPENCODE_CONFIG_CONTENT`
+(step 6). What's true is narrower than "no custom logic": there's no custom *deep-merge algorithm*
+(opencode's own precedence rules do that part), but there *is* real, authored orchestration logic
+deciding what gets fed into that resolution chain in the first place.
+
+`OPENCODE_CONFIG_CONTENT` (step 6, set by the control plane at spawn time) is the fact that must
+survive every override **from steps 1-5** — narrower in two ways than earlier drafts of this document
+implied: (a) it is not the chain's *highest* layer in general (steps 7-8 could still override it on a
+managed macOS deployment, though those don't apply here), and (b) what it actually needs to carry is
+narrower than a full provider block.
+
+**Declared correction (superseding the single-`provider.litellm`-block framing previously here):**
+per `docs/archive/ai-coding-agent-doc.md`'s own "OpenCode config layering" chapter, the full provider
+catalog — arbitrary numbers of gateways/providers, each with its own `npm` package and `baseURL` — is
+**Platform config repo territory** (step 2 above), not control-plane-injected config. `model` is
+already `providerID/modelID` (`splitModel`, §8 below) precisely so that any number of providers can be
+registered in that layer and selected per-session/per-prompt — the control plane was never meant to
+enumerate them. Confirming evidence already in this doc: the reference example's `apiKey` value is the
+literal dummy string `"unused-injected-by-proxy"` — the real secret is injected by Caddy's
+`header_up Authorization` at the network boundary (§12), never carried in the JSON config at all. So
+even the one provider block previously shown here was never actually about credentials — at most it
+was routing information that itself belongs in the Platform layer.
+
+What `OPENCODE_CONFIG_CONTENT` (step 6) **actually** must own — narrowly, and only this:
 
 ```jsonc
 {
   "model": "litellm/eu.anthropic.claude-sonnet-4-6",
-  "autoupdate": false,
-  "provider": {
-    "litellm": {
-      "npm": "@ai-sdk/openai-compatible",
-      "options": { "baseURL": "http://sandbox-proxy:8080/litellm", "apiKey": "unused-injected-by-proxy" }
-    }
-  }
+  "autoupdate": false
 }
 ```
 
-The control plane owns provider-routing enforcement *and* the model-selection overwrite (both
-expressed through this one non-negotiable layer, confirmed to match production's own runtime-overwrite
-behavior) — it does not own the broader OpenCode config schema (agents, tools, skills, model catalog),
-which remain platform/team/repo-owned files, unchanged in directory convention from the source doc
+- `model` — the session's chosen model, which must not be silently overridable by Platform/team/repo
+  config (steps 2/4/5) — that's the whole point of using step 6 for this, not a lower step.
+- `autoupdate: false` — pinned agent behavior, unrelated to providers entirely.
+
+**Open design question, precedence-checked but not settled here (corrects an inversion error from an
+earlier draft of this section — see `docs/phase_01_findings.md`'s post-close note for the full trail):**
+an earlier version of this section proposed writing a default/example gateway block via `OPENCODE_CONFIG`
+(step 3) so any real Platform config repo (step 2, Global) would "naturally" override it with no
+conditional logic. **That direction is backwards.** opencode's own docs state sources are loaded
+1→8 and "later sources override earlier ones" (step 8 is explicitly "highest priority") — so **step 3
+(`OPENCODE_CONFIG`) is loaded after, and therefore overrides, step 2 (Global)**, not the reverse. A
+control-plane default written via `OPENCODE_CONFIG` would permanently shadow the Platform config
+repo's own provider definitions, the opposite of "default, real config wins" semantics.
+
+The only step *below* Global (step 2) is Remote config (step 1, fetched by opencode itself from
+`.well-known/opencode` over HTTP) — not a file/env var the control plane can locally inject at spawn
+time in the same way, so there is no clean precedence-only slot for "default that a Platform config
+repo can silently override." The realistic options are therefore still an explicit choice, not a
+zero-branching precedence trick:
+- **Option A:** write the control plane's default gateway block directly into the Global config path
+  itself (`~/.config/opencode/opencode.json` inside the sandbox) *before* the Platform config repo is
+  cloned into that same path, so the clone step's own file overwrite (not opencode's precedence
+  resolution) is what determines the outcome — fragile, depends on bootstrap ordering, not opencode's
+  arbitration.
+- **Option B:** keep the default injection explicitly conditional in control-plane code — only write
+  it when the session's Platform config repo failed to resolve/clone — accepting the branching logic
+  this was trying to avoid.
+- **Option C:** don't inject any default at all (matches the earlier "Option A" from before this
+  correction) — every environment, including this project's own dev/e2e stack, must have a real
+  Platform config repo (or an equivalent stand-in) before a session can invoke any model.
+
+This is deliberately left open for whoever implements Phase 2 to resolve, with the corrected
+precedence facts above — not decided silently, and not assumed to be zero-branching. Tracked in
+[GitHub issue #1](https://github.com/tbrandenburg/agent-control-plane/issues/1) (blocked on Phase 2's
+real-bootstrap work landing first, per that issue's own sequencing note).
+
+The control plane owns the model-selection overwrite only (not provider-routing enforcement, which
+belongs to the Platform layer + Caddy's credential injection, §12) — it does not own the broader
+OpenCode config schema (agents, tools, skills, model catalog), which remain platform/team/repo-owned
+files, unchanged in directory convention from the source doc
 (`agents/`, `commands/`, `skills/<name>/SKILL.md`, `tools/<name>.js`, `plugins/`).
 
 **Built-in tools:** `create-pull-request` and `create-issue-comment` are baked into the sandbox
@@ -698,7 +763,12 @@ services:
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       GITHUB_URL: ${GITHUB_URL}   # api.github.com, a GHDR tenant host, or a GHES host — same
                                    # env var pattern as production's own GITHUB_URL config toggle
-      LITELLM_API_KEY: ${LITELLM_API_KEY}
+      # One `handle_path`/credential-injection block per configured model gateway — LiteLLM is the
+      # example/default below, not the only supported shape (§8's declared correction). Additional
+      # gateways registered in the Platform config repo's opencode.json would each need their own
+      # route + credential env var here, since Caddy is the sole egress bridge (§3) regardless of
+      # which layer defines the provider's existence.
+      MODEL_GATEWAY_API_KEY: ${MODEL_GATEWAY_API_KEY:-${LITELLM_API_KEY}}
 
   # sandbox containers: spawned dynamically, always sandbox-net ONLY, never the docker socket,
   # each with a per-session INTERNAL_TOKEN minted at spawn time.
@@ -712,9 +782,13 @@ services:
       header_up Host {env.GITHUB_URL}
     }
   }
-  handle_path /litellm/* {
+  # One block per configured model gateway. LiteLLM shown here as the default/example — see §8's
+  # declared correction: the Platform config repo's opencode.json may register additional gateways,
+  # each needing its own `handle_path` + credential env var, since sandboxes can never reach the
+  # internet directly (§3/§12) regardless of which config layer names the provider.
+  handle_path /model-gateway/* {
     reverse_proxy https://litellm.internal.example.com {
-      header_up Authorization "Bearer {env.LITELLM_API_KEY}"
+      header_up Authorization "Bearer {env.MODEL_GATEWAY_API_KEY}"
     }
   }
 }
@@ -785,7 +859,7 @@ technology, and its task, cross-referenced against `ai-coding-agent-doc.md`'s ow
 | Credential injection | Caddy (`sandbox-proxy` container, path-prefix reverse proxy) | Declared deviation from production's custom TLS-terminating MITM forward proxy — same secret-custody outcome, far less code (§12, §13) |
 | Sandbox bridge | Node.js (`sandbox/bridge.js`, small inbound HTTP server) | Direct analog of the Python supervisor, but push not poll — control plane calls it synchronously over `sandbox-net`; owns idle watchdog, SSE relay, `opencode_session_id` reporting (§8) |
 | Coding agent runtime | `opencode serve` (HTTP + SSE, confirmed match to production) | Model invocation, tool execution, durable local conversation state (§8) |
-| Model gateway | LiteLLM | `litellm/<model>` routing via `OPENCODE_CONFIG_CONTENT`'s `provider.litellm` block, proxied through Caddy (§8) |
+| Model gateway(s) | **Declared deviation (superseding earlier LiteLLM-only framing):** 0..N operator/team-configured gateways via the Platform config repo's opencode.json, resolved by opencode's native config layering — not enumerated in control-plane code. LiteLLM remains the default/example, and the control plane's own non-negotiable layer may still inject one fallback gateway for environments with no Platform config repo yet (open design question, §8) | `providerID/modelID` (`splitModel`, §8) already supports arbitrary provider ids; the control plane only ever overwrites `model`, never a provider catalog, in its non-negotiable `OPENCODE_CONFIG_CONTENT` layer |
 | Model listing | Static, hand-curated allowlist (`config.js`) — confirmed to match production exactly | `GET /api/models` is UI-only; session/prompt endpoints validate `provider/model` syntax only, never catalog membership (§5, §13) |
 | Config layering | `opencode`'s native config-precedence resolution, plus authored bootstrap composition logic | No custom merge-*algorithm*; real authored code clones/sparse-checks-out/SHA-pins and mounts platform/team/repo trees, and the non-negotiable `OPENCODE_CONFIG_CONTENT` layer overwrites model selection at runtime (§8) |
 | Persistent workspace | Named Docker volume (per session) + hourly reaper (`setInterval`) | Direct analog of PVC + reaper-driven retention (§7, §12, §13); `opencode_session_id` lives in the control-plane DB, not solely on the volume |

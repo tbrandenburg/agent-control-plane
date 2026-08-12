@@ -149,8 +149,22 @@ of them for the least possible code.
 - `wsToken` in **plaintext, no rotation** — deliberate, tracked, closed in Phase 4
 - Real bootstrap (§10): `git ls-remote` → SHA-pin → `git fetch --depth 1` → checkout, all three trees,
   sparse checkout for team config, stderr failure classification
-- `OPENCODE_CONFIG_CONTENT` composition (§8), `GET /api/models` static allowlist,
-  `reasoningEffort` → `model.variant` passthrough
+- `OPENCODE_CONFIG_CONTENT` composition (§8) — **narrowed to `model` + `autoupdate: false` only per
+  §8's declared correction; no per-gateway provider block enumerated in control-plane code.** Platform
+  config repo cloning (this phase's own bootstrap work, above) is what actually supplies the provider
+  catalog opencode resolves natively — the control plane must not duplicate that as application code.
+  **Sequencing dependency: implement after real bootstrap (the `git ls-remote`/clone bullet above),
+  not before** — two of the three open-decision options below need bootstrap success/failure to be
+  detectable per session.
+  **Still an open decision (§8 — corrected after an earlier precedence-direction error):** whether to
+  inject a default/example gateway block at all for environments without a Platform config repo, and
+  if so, by which mechanism — `OPENCODE_CONFIG` (step 3) actually *overrides* the Platform config repo
+  (step 2, Global), not the reverse, so it cannot be used for zero-branching "default, real config
+  wins" semantics as an earlier draft claimed. Tracked as
+  [GitHub issue #1](https://github.com/tbrandenburg/agent-control-plane/issues/1) — resolve its
+  Options A/B/C explicitly in code review before implementing, and note the issue's own sequencing
+  note requiring Phase 2's real-bootstrap bullet to land first.
+- `GET /api/models` static allowlist, `reasoningEffort` → `model.variant` passthrough
 - Async spawn split: `status: pending_bootstrap` + `setImmediate` (§10)
 - `POST /api/sessions/:id/stop`, `PATCH /api/sessions/:id`, healthcheck-gated readiness (§8)
 

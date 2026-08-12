@@ -125,3 +125,31 @@ session → sandbox spawns and becomes healthy → prompt delivered → SSE fram
 exit criterion — "you click New Session in a browser, type a prompt, and watch tokens appear" — is
 met at the API/bridge layer with real evidence; the dashboard's own consumption of `message.part.delta`
 is the one open item noted above.
+
+## Post-close scope correction: model gateway was over-specified to LiteLLM
+
+Found during customer review after this phase closed, not during original implementation.
+`control-plane/src/sandbox.js`'s `OPENCODE_CONFIG_CONTENT` composition and `docker-compose.yml`'s
+`LITELLM_BASE_URL`/`LITELLM_API_KEY` env vars hardcode a single named gateway, contradicting
+`docs/archive/ai-coding-agent-doc.md`'s own "OpenCode config layering" chapter: the full provider
+catalog belongs in the Platform config repo's `opencode.json` (opencode's native config layering),
+not in control-plane-injected config — `model` is already `providerID/modelID` precisely so any
+number of providers can be registered there and selected per-session/per-prompt. The control plane's
+non-negotiable `OPENCODE_CONFIG_CONTENT` layer should only ever own `model` + `autoupdate: false`.
+This is a real, if minor, scope gap in Phase 1's implementation (not just a naming/vendor
+preference) — see `docs/ARCHITECTURE.md` §8's declared correction and `docs/ROADMAP.md` Phase 2's
+updated scope bullet for the fix, deferred there since Phase 1 is already closed.
+
+**Follow-up correction to the above (same review session, before any code was written):** an initial
+proposed fix — inject the control plane's default gateway block via `OPENCODE_CONFIG` (a file path)
+so a real Platform config repo would "naturally" override it with no branching logic — was itself
+wrong. Checked against opencode's own documented 8-step config precedence (Context7
+`/anomalyco/opencode`, `config.mdx`): `OPENCODE_CONFIG` is step 3, loaded *after* and therefore
+*overriding* Global config (step 2, where the Platform config repo is cloned) — the opposite of the
+intended "default, real config wins" direction. Corrected in `docs/ARCHITECTURE.md` §8 to an
+explicit, still-open decision between three options (write into Global's own file path ahead of the
+Platform clone; keep the existing fallback injection but make it conditional on bootstrap
+success/failure; or inject no default at all and require a real Platform config repo everywhere,
+including this project's own dev/e2e stack). No option was silently chosen — recorded as an open
+decision in [GitHub issue #1](https://github.com/tbrandenburg/agent-control-plane/issues/1) for
+whoever implements Phase 2.

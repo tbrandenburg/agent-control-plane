@@ -136,7 +136,7 @@ The main application screen — watch progress, send prompts, inspect results, m
 ```text
 ┌────────────────────────────────────────────────────────────────────────────────────────────┐
 │ ← Sessions   Fix flaky retry test                           ● Connected     [Stop] [Archive] │
-│              eBike/payments-service • litellm/claude-sonnet-4-6 • High               [⋮] │
+│              eBike/payments-service • acme-gateway/claude-sonnet-4-6 • High          [⋮] │
 ├────────────────────────────────────────────────────────────────────────────────────────────┤
 │ ⏱ Available until 8/18/2026, 3:05 PM (in 7d 2h)       Session ID: 7f3e2b3a-1c6d-4f2b-9a2c   │
 ├──────────────────────────────────────────────────────────────────────────────┬─────────────┤
