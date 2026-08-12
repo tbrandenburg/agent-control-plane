@@ -4,8 +4,10 @@ This document describes the **current, final design** — not the history of how
 supersedes `docs/archive/INITIAL.md`, whose 17 rounds of review/retraction are preserved there for
 provenance only. Where this document and the archive disagree, this document is correct.
 
-For the target *behavior* this system reimplements, see `docs/ai-coding-agent-doc.md` — that remains
-the source-of-truth spec for external contract (API shapes, WebSocket protocol, webhook semantics).
+For the target *behavior* this system reimplements, see [`docs/archive/ai-coding-agent-doc.md`](./archive/ai-coding-agent-doc.md) — that remains
+the source-of-truth spec for external contract (API shapes, WebSocket protocol, webhook semantics),
+moved into `docs/archive/` alongside `INITIAL.md` since it documents the original K8s-based system, not
+this one, but it is still load-bearing: every deviation in §13 is measured against it.
 This document describes how a Docker-only, single-tenant, <1000-authored-LOC system satisfies that
 contract.
 
@@ -18,7 +20,7 @@ contract.
 
 ## 1. Purpose & scope
 
-**Goal:** reimplement the capabilities in `docs/ai-coding-agent-doc.md` (a control plane for running
+**Goal:** reimplement the capabilities in [`docs/archive/ai-coding-agent-doc.md`](./archive/ai-coding-agent-doc.md) (a control plane for running
 non-interactive, background `opencode` coding-agent sessions in isolated sandboxes) as the simplest
 possible Docker-only system — no Kubernetes, no Helm, no service mesh, no PostgreSQL.
 
