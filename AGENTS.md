@@ -119,4 +119,12 @@
   override), so it reads the *default* project's database even when the HTTP requests target an
   isolated stack's port — it cannot be run in isolation without also symlinking/overriding that
   path; prefer running only `smoke.spec.ts` (no direct DB access) for isolated verification runs.
+- 2026-08-13: `pnpm run lint` runs `biome check --write .` locally, silently auto-fixing
+  formatting drift so the command reports clean even when new code doesn't match Biome's actual
+  formatting rules — CI's `checks` job runs the read-only `biome check .` (no `--write`) and fails
+  on exactly that drift. Reproduced live: a subagent-written multi-line `for`/`test(...)` block in
+  `e2e/tests/smoke.spec.ts` passed local `pnpm run lint` (which reformatted it in place without
+  ever showing a diff) but failed CI's lint job on the pushed, unformatted version. Before pushing,
+  run the CI-equivalent read-only `pnpm exec biome check .` (not `--write`) as a final gate, or
+  always `git diff` after `pnpm run lint` to confirm nothing needed fixing.
 
