@@ -3,6 +3,7 @@ dist/
 build/
 control-plane/public/
 data/
+workspace/
 *.db
 *.db-wal
 *.db-shm
@@ -14,3 +15,4 @@ coverage/
 test-results/
 playwright-report/
 .playwright-mcp/
+.worktrees/
