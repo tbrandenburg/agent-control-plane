@@ -5,7 +5,11 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { isValidModelReference } from '../model.js';
+import {
+  isValidModelReference,
+  isValidRepoSegment,
+  isValidTitle,
+} from '../model.js';
 import * as defaultSandbox from '../sandbox.js';
 
 const DEFAULT_LIMIT = 20;
@@ -242,6 +246,18 @@ export function registerSessionsRoutes(
     ) {
       reply.code(400);
       return { error: 'INVALID_SESSION_BODY' };
+    }
+    if (!isValidTitle(title)) {
+      reply.code(400);
+      return { error: 'INVALID_TITLE' };
+    }
+    if (!isValidRepoSegment(repoOwner)) {
+      reply.code(400);
+      return { error: 'INVALID_REPO_OWNER' };
+    }
+    if (!isValidRepoSegment(repoName)) {
+      reply.code(400);
+      return { error: 'INVALID_REPO_NAME' };
     }
     if (!isValidModelReference(model)) {
       reply.code(400);
