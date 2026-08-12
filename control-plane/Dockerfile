@@ -6,6 +6,14 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME/bin:$PATH"
 RUN corepack enable
 
+# `docker` CLI so `control-plane/src/sandbox.js` (`spawn('docker', ...)`) can talk to the host
+# daemon over the bind-mounted `/var/run/docker.sock` (docker-compose.yml). This container runs
+# as root (see the dropped `USER node` below) purely so it can read that host socket without
+# fragile host-GID matching — deliberately insecure this phase, same "single flag to flip" pattern
+# as every other PHASE-4 item in ARCHITECTURE.md §12.
+RUN apt-get update && apt-get install -y --no-install-recommends docker.io \
+  && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Manifests first so `pnpm install` layers cache independently of source changes.
@@ -23,9 +31,6 @@ COPY control-plane control-plane
 # image (see docs/plan/steps/*/00501-dockerfile-missing-dashboard-build.md).
 RUN test -f control-plane/public/index.html || \
   (echo "ERROR: control-plane/public/index.html missing — run 'make build' before 'docker build'" >&2 && exit 1)
-
-RUN chown -R node:node /app
-USER node
 
 EXPOSE 3000
 

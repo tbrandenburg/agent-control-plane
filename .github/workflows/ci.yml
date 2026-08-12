@@ -53,6 +53,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Build sandbox image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: sandbox/Dockerfile
+          tags: agent-sandbox:local
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Install Playwright browsers
         run: pnpm --filter e2e exec playwright install --with-deps chromium
 

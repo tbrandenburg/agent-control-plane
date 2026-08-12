@@ -1,0 +1,12 @@
+{
+  "name": "sandbox",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test *.test.js"
+  },
+  "dependencies": {
+    "opencode-ai": "^1.18.16"
+  }
+}

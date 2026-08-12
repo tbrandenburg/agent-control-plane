@@ -21,9 +21,9 @@ const CEILING = 1000;
  * Phase 4 creates it).
  */
 const COMPONENTS = [
-  { name: 'Public API', globs: [] },
+  { name: 'Public API', globs: ['control-plane/src/routes/*.js'] },
   { name: 'WS relay', globs: [] },
-  { name: 'Sandbox lifecycle', globs: [] },
+  { name: 'Sandbox lifecycle', globs: ['control-plane/src/sandbox.js'] },
   { name: 'Bootstrap', globs: [] },
   { name: 'Prompt/stop delivery', globs: [] },
   { name: 'SQLite', globs: ['control-plane/src/db.js'] },

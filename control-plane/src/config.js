@@ -1,7 +1,16 @@
 /**
  * Environment-driven configuration for the control plane, with safe defaults.
- * This is the future home of `MODEL_ALLOWLIST` (see ARCHITECTURE.md §5).
  */
+
+/**
+ * Static, hand-curated list of approved models for `GET /api/models` (ARCHITECTURE.md §5).
+ * UI/discovery only — `POST /api/sessions` and `POST /api/sessions/:id/prompt` validate `model`
+ * against syntax only, never membership in this list.
+ * @type {ReadonlyArray<{id: string, name: string}>}
+ */
+export const MODEL_ALLOWLIST = [
+  { id: 'litellm/eu.anthropic.claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
+];
 
 /**
  * @typedef {object} ControlPlaneConfig

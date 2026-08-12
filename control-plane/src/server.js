@@ -9,6 +9,9 @@ import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { loadConfig } from './config.js';
 import { openDb } from './db.js';
+import { registerInternalRoutes } from './routes/internal.js';
+import { registerModelsRoutes } from './routes/models.js';
+import { registerSessionsRoutes } from './routes/sessions.js';
 
 const publicDir = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -27,8 +30,13 @@ export function buildServer() {
   const db = openDb(dataDir);
 
   app.addHook('onClose', () => db.close());
+  app.decorate('db', db);
 
   app.get('/health', async () => ({ status: 'ok' }));
+
+  registerSessionsRoutes(app, db);
+  registerInternalRoutes(app, db);
+  registerModelsRoutes(app);
 
   // `@fastify/static` only warns (doesn't throw) when `publicDir` is missing, so `/health`
   // keeps working even before `make build` has produced a dashboard bundle.

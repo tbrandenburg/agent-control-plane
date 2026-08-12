@@ -2,3 +2,4 @@ packages:
   - control-plane
   - control-plane/dashboard
   - e2e
+  - sandbox

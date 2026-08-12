@@ -1,4 +1,4 @@
-.PHONY: help install run stop test lint build clean loc e2e typecheck
+.PHONY: help install run stop test lint build clean loc e2e typecheck sandbox-image
 
 ## Default target — list all available targets.
 help:
@@ -42,6 +42,7 @@ loc:
 ## Bring up the real docker compose stack, run Playwright against it, then tear it down.
 e2e:
 	@trap 'docker compose down -v' EXIT; \
+	$(if $(SKIP_BUILD),,docker compose build sandbox;) \
 	docker compose up -d $(if $(SKIP_BUILD),,--build); \
 	timeout=60; \
 	until curl -sf http://localhost:$${HOST_PORT:-3000}/health > /dev/null 2>&1; do \
@@ -58,3 +59,7 @@ e2e:
 ## Type-check all workspaces with tsc (no build step).
 typecheck:
 	pnpm run typecheck:all
+
+## Build the sandbox image (agent-sandbox:local) used by control-plane/src/sandbox.js.
+sandbox-image:
+	docker compose build sandbox

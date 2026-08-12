@@ -23,19 +23,22 @@ describe('openDb', () => {
     const rows = db.prepare('SELECT filename FROM _migrations').all();
     db.close();
 
-    expect(rows).toEqual([{ filename: '001_init.sql' }]);
+    expect(rows).toEqual(
+      expect.arrayContaining([{ filename: '001_init.sql' }]),
+    );
   });
 
   it('is idempotent on re-run', () => {
     dataDir = mkdtempSync(join(tmpdir(), 'cp-db-test-'));
 
     const first = openDb(dataDir);
+    const before = first.prepare('SELECT filename FROM _migrations').all();
     first.close();
     const second = openDb(dataDir);
     const rows = second.prepare('SELECT filename FROM _migrations').all();
     second.close();
 
-    expect(rows).toEqual([{ filename: '001_init.sql' }]);
+    expect(rows).toEqual(before);
   });
 
   it('applies migrations in ascending lexicographic filename order, not creation order', () => {

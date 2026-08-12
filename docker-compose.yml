@@ -9,5 +9,48 @@ services:
     volumes:
       - ./data:/data
       - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - egress-net
     environment:
       DATA_DIR: /data
+      # PHASE-4: sandboxes move to an `internal: true` `sandbox-net`; egress-net stays for the
+      # control plane's own outbound traffic. See ARCHITECTURE.md §12.
+      SANDBOX_IMAGE: agent-sandbox:local
+      SANDBOX_NETWORK: egress-net
+      WORKSPACE_HOST_PATH: ${WORKSPACE_HOST_PATH:-${PWD}/workspace}
+      CONTROL_PLANE_URL: http://control-plane:3000
+      # PHASE-4: injected by the Caddy sandbox-proxy instead of a raw env var passed to sandboxes.
+      # Defaults point at `stub-model` below (e2e/fixtures/stub-model-server.mjs) so `make e2e`
+      # is free/deterministic and needs no external credentials — override both to route at a
+      # real LiteLLM deployment instead (docs/phase_01_findings.md).
+      LITELLM_BASE_URL: ${LITELLM_BASE_URL:-http://stub-model:4141/v1}
+      LITELLM_API_KEY: ${LITELLM_API_KEY:-stub-key}
+    depends_on:
+      - stub-model
+
+  # Never started by `docker compose up` — sandboxes are spawned dynamically per session via
+  # `docker run` (control-plane/src/sandbox.js), not as a long-running compose service. This
+  # entry exists only so `docker compose build sandbox` (make sandbox-image) builds/tags the image.
+  sandbox:
+    image: agent-sandbox:local
+    build:
+      context: .
+      dockerfile: sandbox/Dockerfile
+    profiles: ["build-only"]
+
+  # E2E-only stand-in for a real model provider — see e2e/fixtures/stub-model-server.mjs's own
+  # header comment for why this isn't a violation of the "no mocks in E2E" rule (it substitutes
+  # only the third-party model backend, never Docker/opencode/the bridge/the SSE relay).
+  stub-model:
+    image: node:24-slim
+    command: ["node", "/fixtures/stub-model-server.mjs"]
+    volumes:
+      - ./e2e/fixtures:/fixtures:ro
+    environment:
+      PORT: "4141"
+    networks:
+      - egress-net
+
+networks:
+  egress-net:
+    name: egress-net
