@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+control-plane/public/
+data/
+*.db
+*.db-wal
+*.db-shm
+*.log
+.DS_Store
+coverage/
+.env
+.env.local
+test-results/
+playwright-report/
+.playwright-mcp/

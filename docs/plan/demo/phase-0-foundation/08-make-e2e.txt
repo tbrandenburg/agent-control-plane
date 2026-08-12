@@ -1,0 +1,87 @@
+ Image agent-control-plane:local Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 624B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 1.48kB done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/node:24-slim
+#3 DONE 1.3s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 105B 0.0s done
+#4 DONE 0.0s
+
+#5 [ 1/11] FROM docker.io/library/node:24-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03
+#5 DONE 0.0s
+
+#6 [internal] load build context
+#6 transferring context: 305.73kB 0.1s done
+#6 DONE 0.1s
+
+#7 [ 3/11] WORKDIR /app
+#7 CACHED
+
+#8 [ 6/11] COPY control-plane/dashboard/package.json control-plane/dashboard/package.json
+#8 CACHED
+
+#9 [ 4/11] COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+#9 CACHED
+
+#10 [ 5/11] COPY control-plane/package.json control-plane/package.json
+#10 CACHED
+
+#11 [ 7/11] COPY e2e/package.json e2e/package.json
+#11 CACHED
+
+#12 [ 2/11] RUN corepack enable
+#12 CACHED
+
+#13 [ 8/11] RUN pnpm install --frozen-lockfile --prod --filter control-plane...
+#13 CACHED
+
+#14 [ 9/11] COPY control-plane control-plane
+#14 DONE 0.1s
+
+#15 [10/11] RUN test -f control-plane/public/index.html ||   (echo "ERROR: control-plane/public/index.html missing — run 'make build' before 'docker build'" >&2 && exit 1)
+#15 DONE 0.5s
+
+#16 [11/11] RUN chown -R node:node /app
+#16 DONE 5.6s
+
+#17 exporting to image
+#17 exporting layers
+#17 exporting layers 0.9s done
+#17 writing image sha256:85e1a575f875c464bb114ef18b03d9e4cd019a4a89beaccb0db7aab605d83b36 done
+#17 naming to docker.io/library/agent-control-plane:local done
+#17 DONE 0.9s
+
+#18 resolving provenance for metadata file
+#18 DONE 0.0s
+ Image agent-control-plane:local Built 
+ Network agent-control-plane_default Creating 
+ Network agent-control-plane_default Created 
+ Container agent-control-plane-control-plane-1 Creating 
+ Container agent-control-plane-control-plane-1 Created 
+ Container agent-control-plane-control-plane-1 Starting 
+ Container agent-control-plane-control-plane-1 Started 
+
+> agent-control-plane@0.0.1 e2e /home/tom/workspace/ai/made/workspace/agent-control-plane
+> pnpm --filter e2e exec playwright test
+
+
+Running 3 tests using 1 worker
+
+  ✓  1 tests/smoke.spec.ts:5:7 › smoke › dashboard shell renders at / (496ms)
+  ✓  2 tests/smoke.spec.ts:10:7 › smoke › GET /health returns 200 ok (10.1s)
+  ✓  3 tests/smoke.spec.ts:16:7 › smoke › /sessions/new serves the SPA rather than 404 (507ms)
+
+  3 passed (12.9s)
+ Container agent-control-plane-control-plane-1 Stopping 
+ Container agent-control-plane-control-plane-1 Stopped 
+ Container agent-control-plane-control-plane-1 Removing 
+ Container agent-control-plane-control-plane-1 Removed 
+ Network agent-control-plane_default Removing 
+ Network agent-control-plane_default Removed 

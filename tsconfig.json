@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "strict": true,
+    "noEmit": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "lib": ["es2022"],
+    "types": ["node"],
+    "skipLibCheck": true
+  },
+  "include": ["control-plane/src/**/*.js"],
+  "exclude": [
+    "node_modules",
+    "control-plane/dashboard",
+    "control-plane/node_modules"
+  ]
+}

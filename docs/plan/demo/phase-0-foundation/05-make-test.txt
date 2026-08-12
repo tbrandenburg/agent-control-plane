@@ -1,0 +1,55 @@
+pnpm run test:all
+
+> agent-control-plane@0.0.1 test:all /home/tom/workspace/ai/made/workspace/agent-control-plane
+> pnpm -r run test && pnpm run test:scripts
+
+Scope: 3 of 4 workspace projects
+control-plane test$ vitest run
+control-plane/dashboard test$ vitest run
+control-plane test:  RUN  v4.1.10 /home/tom/workspace/ai/made/workspace/agent-control-plane/control-plane
+control-plane/dashboard test:  RUN  v4.1.10 /home/tom/workspace/ai/made/workspace/agent-control-plane/control-plane/dashboard
+control-plane test: (node:871628) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+control-plane test: (Use `node --trace-warnings ...` to show where the warning was created)
+control-plane test: {"level":30,"time":1786547719007,"pid":871628,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/sessions/new","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786547719029,"pid":871628,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":18.37828300000001,"msg":"request completed"}
+control-plane test: (node:871646) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+control-plane test: (Use `node --trace-warnings ...` to show where the warning was created)
+control-plane test: {"level":30,"time":1786547719972,"pid":871646,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/health","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786547719989,"pid":871646,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":14.274002999999993,"msg":"request completed"}
+control-plane test: (node:871657) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+control-plane test: (Use `node --trace-warnings ...` to show where the warning was created)
+control-plane test: (node:871664) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+control-plane test: (Use `node --trace-warnings ...` to show where the warning was created)
+control-plane test:  Test Files  5 passed (5)
+control-plane test:       Tests  10 passed (10)
+control-plane test:    Start at  17:15:17
+control-plane test:    Duration  3.94s (transform 246ms, setup 0ms, import 1.09s, tests 738ms, environment 1ms)
+control-plane test: Done
+control-plane/dashboard test:  Test Files  1 passed (1)
+control-plane/dashboard test:       Tests  1 passed (1)
+control-plane/dashboard test:    Start at  17:15:18
+control-plane/dashboard test:    Duration  3.97s (transform 179ms, setup 0ms, import 659ms, tests 388ms, environment 2.43s)
+control-plane/dashboard test: Done
+
+> agent-control-plane@0.0.1 test:scripts /home/tom/workspace/ai/made/workspace/agent-control-plane
+> node --test scripts/*.test.mjs
+
+✔ isBlankOrComment treats blank lines as comment-only (1.873015ms)
+✔ isBlankOrComment treats //, /* */, and # comment lines as comment-only (0.327609ms)
+✔ isBlankOrComment treats authored code as not comment-only (0.304609ms)
+✔ countFile contributes 0 for a file with blank lines only (1.885789ms)
+✔ countFile contributes 0 for a file with comment-only lines (0.632463ms)
+✔ countFile counts authored lines mixed with blank/comment lines (0.60955ms)
+✔ countFile returns 0 without throwing for a missing file (0.962437ms)
+✔ expand excludes paths matching EXCLUDE_PATTERNS even with authored lines (40.529804ms)
+✔ expand contributes 0 files without throwing for a glob matching nothing (6.572784ms)
+✔ CLI exits 0 and prints a passing total for the real repo tree (100.272643ms)
+✔ CLI exits 1 when a synthetic total exceeds the ceiling (82.879328ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 387.871564

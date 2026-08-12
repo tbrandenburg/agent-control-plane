@@ -1,0 +1,19 @@
+pnpm run loc
+
+> agent-control-plane@0.0.1 loc /home/tom/workspace/ai/made/workspace/agent-control-plane
+> node scripts/loc.mjs
+
+Component                 LOC
+Public API                  0
+WS relay                    0
+Sandbox lifecycle           0
+Bootstrap                   0
+Prompt/stop delivery        0
+SQLite                     49
+Webhook                     0
+Reaper                      0
+Auth                        0
+Bridge                      0
+Proxy config glue           0
+Dashboard (server glue)    42
+TOTAL                      91 / 1000  ✅

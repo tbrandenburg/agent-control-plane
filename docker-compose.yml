@@ -1,0 +1,13 @@
+services:
+  control-plane:
+    image: agent-control-plane:local
+    build:
+      context: .
+      dockerfile: control-plane/Dockerfile
+    ports:
+      - "${HOST_PORT:-3000}:3000"
+    volumes:
+      - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      DATA_DIR: /data

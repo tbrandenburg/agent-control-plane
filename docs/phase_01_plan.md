@@ -20,6 +20,23 @@ in the entire design, and this phase kills all three for the least possible code
 3. Does storing every frame verbatim ([§4](./ARCHITECTURE.md)) produce a usable transcript, or an
    unmanageable firehose?
 
+> **Dev-environment note:** `opencode` is already installed locally on this machine, so assumption #1
+> above can be spiked against a real `opencode serve` process outside the sandbox/Docker path before
+> writing the bridge — run `opencode serve` locally, hit its SSE endpoint directly (e.g. `curl -N`), and
+> inspect actual frame shapes/timing. Use this to de-risk [§8](./ARCHITECTURE.md)'s SSE contract cheaply
+> before committing to the bridge's relay implementation.
+>
+> References: [server docs](https://opencode.ai/docs/server/) (`opencode serve` flags/auth, full HTTP
+> API including `GET /event` SSE stream — first event `server.connected`), [SDK docs](https://opencode.ai/docs/sdk/)
+> (`@opencode-ai/sdk`'s `client.event.subscribe()` for consuming the stream from JS/TS instead of raw
+> `curl`). Source (repo:
+> [anomalyco/opencode](https://github.com/anomalyco/opencode)):
+> [`packages/opencode/src/server/server.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/server/server.ts)
+> (HTTP server/routes) and
+> [`packages/opencode/src/server/event.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/server/event.ts)
+> (SSE event schema) — read these before finalizing the bridge's relay/parsing logic in
+> `sandbox/bridge.js`.
+
 ## Scope
 
 **Included**

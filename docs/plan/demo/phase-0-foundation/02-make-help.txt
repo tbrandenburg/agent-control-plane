@@ -1,0 +1,11 @@
+  [36mhelp        [0m Default target — list all available targets.
+  [36minstall     [0m Install all workspace dependencies via pnpm.
+  [36mrun         [0m Start the control-plane server.
+  [36mstop        [0m Stop the docker compose stack.
+  [36mtest        [0m Run all unit/integration tests across the workspace.
+  [36mlint        [0m Check and fix code quality with biome.
+  [36mbuild       [0m Build the dashboard static bundle into control-plane/public.
+  [36mclean       [0m Remove build artifacts and dependencies.
+  [36mloc         [0m Print the LOC budget table and fail if the total exceeds the ceiling.
+  [36me2e         [0m Bring up the real docker compose stack, run Playwright against it, then tear it down.
+  [36mtypecheck   [0m Type-check all workspaces with tsc (no build step).

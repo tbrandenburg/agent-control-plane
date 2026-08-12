@@ -1,0 +1,10 @@
+pnpm run typecheck:all
+
+> agent-control-plane@0.0.1 typecheck:all /home/tom/workspace/ai/made/workspace/agent-control-plane
+> pnpm -r run typecheck
+
+Scope: 3 of 4 workspace projects
+control-plane typecheck$ tsc --noEmit -p ../tsconfig.json
+control-plane/dashboard typecheck$ tsc --noEmit -p tsconfig.json
+control-plane/dashboard typecheck: Done
+control-plane typecheck: Done

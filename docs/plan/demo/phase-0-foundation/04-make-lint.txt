@@ -1,0 +1,37 @@
+pnpm run lint
+
+> agent-control-plane@0.0.1 lint /home/tom/workspace/ai/made/workspace/agent-control-plane
+> biome check --write .
+
+control-plane/src/db.test.js:83:9 lint/correctness/noUnusedVariables  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━
+
+  ! This variable db is unused.
+  
+    81 │     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    82 │ 
+  > 83 │     let db;
+       │         ^^
+    84 │     try {
+    85 │       expect(() => {
+  
+  i Unused variables are often the result of typos, incomplete refactors, or other sources of bugs.
+  
+  i Unsafe fix: If this is intentional, prepend db with an underscore.
+  
+     81  81 │       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+     82  82 │   
+     83     │ - ····let·db;
+         83 │ + ····let·_db;
+     84  84 │       try {
+     85  85 │         expect(() => {
+     86     │ - ········db·=·openDb(dataDir,·migrationsDir);
+         86 │ + ········_db·=·openDb(dataDir,·migrationsDir);
+     87  87 │         }).toThrow('process.exit called');
+     88  88 │   
+  
+
+Skipped 1 suggested fixes.
+If you wish to apply the suggested (unsafe) fixes, use the command biome check --write --unsafe
+
+Checked 29 files in 91ms. No fixes applied.
+Found 1 warning.

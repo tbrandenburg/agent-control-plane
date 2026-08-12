@@ -1,0 +1,25 @@
+{
+  "name": "agent-control-plane",
+  "version": "0.0.1",
+  "private": true,
+  "engines": {
+    "node": "24.x"
+  },
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "install:all": "pnpm install",
+    "run:control-plane": "pnpm --filter control-plane run start",
+    "test:all": "pnpm -r run test && pnpm run test:scripts",
+    "test:scripts": "node --test scripts/*.test.mjs",
+    "lint": "biome check --write .",
+    "build:dashboard": "pnpm --filter dashboard run build",
+    "loc": "node scripts/loc.mjs",
+    "e2e": "pnpm --filter e2e exec playwright test",
+    "typecheck:all": "pnpm -r run typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.8",
+    "@types/node": "^24.13.3",
+    "typescript": "^7.0.2"
+  }
+}
