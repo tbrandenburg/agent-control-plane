@@ -101,7 +101,7 @@ importers:
   sandbox:
     dependencies:
       opencode-ai:
-        specifier: ^1.18.16
+        specifier: 1.18.16
         version: 1.18.16
 
 packages:
