@@ -167,6 +167,11 @@ of them for the least possible code.
 - `GET /api/models` static allowlist, `reasoningEffort` → `model.variant` passthrough
 - Async spawn split: `status: pending_bootstrap` + `setImmediate` (§10)
 - `POST /api/sessions/:id/stop`, `PATCH /api/sessions/:id`, healthcheck-gated readiness (§8)
+- **Dashboard: Stop/Archive buttons** (`UI.md` §3) — wires the two backend endpoints directly above
+  into the session-detail header; this was previously only an implicit consequence of the backend
+  landing here, never an explicit dashboard deliverable in this scope list, which let it slip past
+  Phase 1 review undetected as a gap (found via adversarial Playwright audit, not caught by any of
+  Phase 1's own validation gates). Explicit now: no phase's dashboard scope silently owns this.
 
 **Exit criterion:** create a session against an arbitrary repository from the dashboard and watch a
 live-streaming transcript.
@@ -185,6 +190,11 @@ pattern matching is the most speculative code in the design.
 - Bridge idle watchdog (15 min), named volumes, hourly reaper with the active-session guard (§12)
 - `GET /api/sessions/:id/sandbox/logs`, `.../sandbox/diagnostics`, `.../artifacts`
 - Dashboard: Overview, Diagnostics, Logs, Artifacts panels + continuation banner (UI.md §3)
+- **Dashboard: Events tab** (`UI.md` §3, "Conversation/Events tabs") — Phase 1 only ever built the
+  Conversation tab (per `docs/phase_01_plan.md`); the Events tab (raw frame-by-frame view, distinct
+  from the human-readable Conversation view) was never explicitly assigned to a phase before now.
+  Landing it here since it depends on no new backend beyond what Phase 1/2 already expose via
+  `GET /api/sessions/:id/events` — purely a dashboard-side addition.
 
 **Exit criterion:** leave a session overnight, return, send a prompt, and the conversation continues
 in a fresh sandbox against the same volume.
@@ -270,6 +280,8 @@ Fully additive; zero coupling to Phases 1-4.
 | Real git bootstrap (hardcoded mount used instead) | P1 | P2 | Additive |
 | Continuation / reaper / volumes | P1-2 | P3 | Additive schema columns |
 | `presence`, `fetch_history`, WS `stop` | P2 | P6 | Additive message types |
+| Dashboard Stop/Archive buttons | P1 | P2 | Additive UI wiring two already-scheduled backend endpoints; found missing via adversarial Playwright audit after Phase 1 closed, not caught by Phase 1's own validation gates |
+| Dashboard Events tab | P1 | P3 | Additive UI, no new backend needed beyond Phase 1/2's existing `GET /api/sessions/:id/events`; same audit-discovered gap as above |
 | `events` retention policy | all | P6 | Open decision (§15) |
 
 ---
