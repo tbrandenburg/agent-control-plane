@@ -18,10 +18,21 @@ export function SessionDetail({ id }: { id: string }) {
   if (isLoading)
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (isError || !session) {
+    const notFound = error?.status === 404;
     return (
-      <p className="text-sm text-red-600">
-        {error?.message ?? 'Session not found.'}
-      </p>
+      <div className="rounded-md border p-4 text-sm">
+        <p className="text-red-600">
+          {notFound
+            ? 'This session does not exist or has been removed.'
+            : 'Something went wrong loading this session.'}
+        </p>
+        <Link
+          to="/"
+          className="mt-2 inline-block text-muted-foreground hover:underline"
+        >
+          ← Back to sessions
+        </Link>
+      </div>
     );
   }
 
