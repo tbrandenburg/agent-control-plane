@@ -20,7 +20,8 @@ const { containerName, inspect, run, waitForHealth } = await import(
 /**
  * Builds a fake child process that emits the given stdout/stderr then closes with `exitCode`.
  * @param {{stdout?: string, stderr?: string, exitCode?: number}} [options] - Fake process behavior.
- * @returns {import('node:events').EventEmitter & {stdout: PassThrough, stderr: PassThrough}} Fake child.
+ * @returns {import('node:child_process').ChildProcess} Fake child, cast to satisfy `spawn`'s
+ *   mocked return type — only `stdout`/`stderr`/`close` are ever used by `sandbox.js`.
  */
 function fakeChild({ stdout = '', stderr = '', exitCode = 0 } = {}) {
   const child = /** @type {any} */ (new EventEmitter());
@@ -31,7 +32,7 @@ function fakeChild({ stdout = '', stderr = '', exitCode = 0 } = {}) {
     if (stderr) child.stderr.emit('data', Buffer.from(stderr));
     child.emit('close', exitCode);
   });
-  return child;
+  return /** @type {import('node:child_process').ChildProcess} */ (child);
 }
 
 beforeEach(() => {

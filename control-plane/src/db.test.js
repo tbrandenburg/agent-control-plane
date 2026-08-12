@@ -88,6 +88,7 @@ describe('openDb', () => {
       expect(() => {
         db = openDb(dataDir, migrationsDir);
       }).toThrow('process.exit called');
+      expect(db).toBeUndefined();
 
       expect(exitSpy).toHaveBeenCalledWith(1);
       expect(errorSpy).toHaveBeenCalledWith(

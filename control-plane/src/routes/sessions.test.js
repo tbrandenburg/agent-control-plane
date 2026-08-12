@@ -323,8 +323,8 @@ describe('POST /api/sessions', () => {
     const row = getDb(app)
       .prepare('SELECT * FROM sessions WHERE id = ?')
       .get(body.id);
-    expect(row.status).toBe('active');
-    expect(row.container_name).toBe('sandbox-x');
+    expect(row?.status).toBe('active');
+    expect(row?.container_name).toBe('sandbox-x');
     await app.close();
   });
 

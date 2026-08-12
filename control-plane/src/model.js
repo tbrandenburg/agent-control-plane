@@ -20,7 +20,7 @@ export function splitModel(model) {
  * `/`. Does NOT check membership in `MODEL_ALLOWLIST` — that gate is deliberately not part of this
  * design (ARCHITECTURE.md §5).
  * @param {unknown} model - Raw value to validate.
- * @returns {boolean} Whether `model` is a syntactically valid `provider/model` reference.
+ * @returns {model is string} Whether `model` is a syntactically valid `provider/model` reference.
  */
 export function isValidModelReference(model) {
   if (typeof model !== 'string' || model.length === 0) return false;
