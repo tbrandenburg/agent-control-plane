@@ -106,4 +106,25 @@
   correct `HOST_PORT`. Before restarting any already-running compose stack, inspect the live
   container's actual port mapping first (`docker ps --format '{{.Ports}}'`) and pass it through
   explicitly, rather than trusting the compose file's own fallback default.
+- 2026-08-13: `docker-compose.yml`'s default project name is derived from the directory name, so
+  running `make e2e` (or any bare `docker compose ...`) from a shell that already has a same-named
+  stack running on this host targets/tears down *that* stack, not an isolated one — its own
+  `trap 'docker compose down -v' EXIT` would have destroyed a live instance. Verified live: a
+  production-like `agent-control-plane` stack was already running on port 3001 when parallel
+  subagent fixes needed E2E verification. Fix: for any ad hoc E2E verification against an
+  already-populated host, always pass an explicit `-p <isolated-project-name>` plus a compose
+  override file redirecting the fixed-name network (`egress-net`), the `./data` bind mount, and
+  `HOST_PORT` to unused values — check `docker ps --format '{{.Ports}}'` for a free port first.
+  Also note: `e2e/tests/session-lifecycle.spec.ts` hardcodes `../data/control-plane.db` (no env
+  override), so it reads the *default* project's database even when the HTTP requests target an
+  isolated stack's port — it cannot be run in isolation without also symlinking/overriding that
+  path; prefer running only `smoke.spec.ts` (no direct DB access) for isolated verification runs.
+- 2026-08-13: `pnpm run lint` runs `biome check --write .` locally, silently auto-fixing
+  formatting drift so the command reports clean even when new code doesn't match Biome's actual
+  formatting rules — CI's `checks` job runs the read-only `biome check .` (no `--write`) and fails
+  on exactly that drift. Reproduced live: a subagent-written multi-line `for`/`test(...)` block in
+  `e2e/tests/smoke.spec.ts` passed local `pnpm run lint` (which reformatted it in place without
+  ever showing a diff) but failed CI's lint job on the pushed, unformatted version. Before pushing,
+  run the CI-equivalent read-only `pnpm exec biome check .` (not `--write`) as a final gate, or
+  always `git diff` after `pnpm run lint` to confirm nothing needed fixing.
 

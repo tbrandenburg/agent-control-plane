@@ -42,9 +42,25 @@ export function buildServer() {
   // keeps working even before `make build` has produced a dashboard bundle.
   app.register(fastifyStatic, { root: publicDir });
 
-  for (const route of ['/', '/sessions/new', '/sessions/:id']) {
-    app.get(route, (_req, reply) => reply.sendFile('index.html'));
-  }
+  // Any unmatched GET request outside `/api` and `/internal` is a client-side route: serve the
+  // SPA shell and let the React router decide how to render it (including its own "not found"
+  // state). API/internal 404s and non-GET methods keep Fastify's default JSON 404 behavior.
+  app.setNotFoundHandler((req, reply) => {
+    const isSpaRoute =
+      req.method === 'GET' &&
+      !req.url.startsWith('/api/') &&
+      !req.url.startsWith('/internal/');
+
+    if (isSpaRoute) {
+      return reply.sendFile('index.html');
+    }
+
+    return reply.code(404).send({
+      message: `Route ${req.method}:${req.url} not found`,
+      error: 'Not Found',
+      statusCode: 404,
+    });
+  });
 
   return app;
 }

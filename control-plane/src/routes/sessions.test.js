@@ -376,6 +376,69 @@ describe('POST /api/sessions', () => {
     await app.close();
   });
 
+  it('rejects an invalid repoOwner with 400 INVALID_REPO_OWNER', async () => {
+    const app = buildServer();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/sessions',
+      payload: {
+        title: 'My session',
+        repoOwner: '../../etc',
+        repoName: 'widgets',
+        model: 'litellm/claude-sonnet',
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'INVALID_REPO_OWNER' });
+    expect(sandbox.run).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('rejects an invalid repoName with 400 INVALID_REPO_NAME', async () => {
+    const app = buildServer();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/sessions',
+      payload: {
+        title: 'My session',
+        repoOwner: 'acme',
+        repoName: 'weird name!!',
+        model: 'litellm/claude-sonnet',
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'INVALID_REPO_NAME' });
+    expect(sandbox.run).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('rejects a title exceeding the max length with 400 INVALID_TITLE', async () => {
+    const app = buildServer();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/sessions',
+      payload: {
+        title: 'x'.repeat(201),
+        repoOwner: 'acme',
+        repoName: 'widgets',
+        model: 'litellm/claude-sonnet',
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'INVALID_TITLE' });
+    expect(sandbox.run).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it('returns 500 with a readable message on spawn failure, leaving the row queryable', async () => {
     vi.mocked(sandbox.run).mockRejectedValue(new Error('docker: bad image'));
     const app = buildServer();
