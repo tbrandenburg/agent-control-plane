@@ -137,6 +137,9 @@ export function useSession(
   return useQuery({
     queryKey: ['session', id],
     queryFn: () => fetchSession(id),
+    // A 404 is definitive (the session doesn't exist and never will) — retrying it
+    // only produces a poll storm against an endpoint that can't ever succeed.
+    retry: (failureCount, error) => error.status !== 404 && failureCount < 3,
   });
 }
 
