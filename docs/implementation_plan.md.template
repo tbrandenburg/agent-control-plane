@@ -1,0 +1,163 @@
+# <Phase>
+
+One-line name of the implementation phase or capability being delivered.
+
+## Goal
+
+State the concrete outcome this phase should achieve and why it matters.
+
+## Scope
+
+Define what is included, excluded, and constrained in this phase.
+
+## Design
+
+Describe the key architecture, contracts, flows, and design decisions that guide the implementation.
+
+## Changes
+
+Summarize the files, components, interfaces, and behaviors that will be created, modified, or removed.
+
+## E2E Tests
+
+Define the user-visible end-to-end scenarios that prove the phase works as intended.
+
+### Happy Path
+
+Cover the primary successful workflow from start to finish.
+
+### Important Variants
+
+Cover meaningful alternative inputs, contexts, modes, or supported usage patterns.
+
+### Error Paths
+
+Cover expected failures and verify useful behavior, messages, and exit states.
+
+### Help / Command Discovery
+
+Verify that new commands, options, documentation, or entry points are discoverable and correct.
+
+### Regression Coverage
+
+Verify that existing critical workflows continue to work after the change.
+
+## Verification
+
+List the final technical and functional checks required before the phase is considered complete.
+
+## Implementation Steps
+
+Break the work into ordered, independently understandable implementation outcomes.
+
+### Step 1: <Implementation Outcome>
+
+Describe one coherent implementation outcome rather than a single low-level file edit.
+
+#### Changes
+
+Identify the concrete codebase changes required for this step.
+
+##### Create
+
+List new files, components, types, tests, or other artifacts to add.
+
+##### Modify
+
+List existing files, components, interfaces, or behavior to update.
+
+##### Remove
+
+List obsolete code, files, behavior, or compatibility paths to delete when applicable.
+
+#### Implementation
+
+Describe exactly how the required behavior should be implemented.
+
+##### <Component / Behavior 1>
+
+Detail the first significant implementation area or behavior.
+
+##### <Component / Behavior 2>
+
+Detail the next significant implementation area or behavior.
+
+##### Error Handling
+
+Define how expected failures should be detected, propagated, and presented.
+
+##### Output / UX
+
+Define user-visible output, interaction behavior, formatting, or API semantics where relevant.
+
+#### Patterns & Constraints
+
+Capture implementation decisions and boundaries the implementer should not have to rediscover.
+
+##### Mirror
+
+Point to existing code, architecture, or conventions that should be followed.
+
+##### Decisions
+
+Record important choices that constrain how the implementation should work.
+
+##### Gotchas
+
+Call out non-obvious edge cases, dependencies, or failure modes that could cause mistakes.
+
+##### Out of Scope
+
+Clarify tempting adjacent work that must not be introduced in this step.
+
+#### Tests
+
+Specify the automated coverage required for this implementation step.
+
+##### E2E
+
+Identify the end-to-end scenarios enabled or affected by this step.
+
+##### Integration
+
+Verify interactions between components, layers, adapters, services, or boundaries.
+
+##### Unit
+
+Cover isolated logic where focused tests provide useful value beyond integration or E2E coverage.
+
+#### Validation
+
+Define how the completed step can be checked immediately and objectively.
+
+##### Commands
+
+List the build, test, lint, type-check, or manual commands used to validate the step.
+
+##### Expected Results
+
+State the observable conditions that confirm the step was implemented correctly.
+
+### Step n: <Implementation Outcome>
+
+Repeat the same structure for each remaining coherent implementation outcome.
+
+#### Changes
+
+Summarize what changes in this step.
+
+#### Implementation
+
+Explain the required behavior and implementation details.
+
+#### Patterns & Constraints
+
+Capture conventions, decisions, gotchas, and boundaries relevant to this step.
+
+#### Tests
+
+Define the E2E, integration, and unit coverage needed for this step.
+
+#### Validation
+
+State how to execute and confirm that this step is complete.

@@ -202,8 +202,9 @@ added here**, since that would be a stricter validation than what's actually dep
 > Do not design or implement dashboard screens from this section alone — `UI.md` is the authoritative
 > UI spec; this section only covers how it's served and authenticated.
 
-The dashboard is **not a separate service** — it's `@fastify/static` serving one static SPA
-(`control-plane/public/`) off the same Fastify process already handling `/api/*`:
+The dashboard is **not a separate service** — it's `@fastify/static` serving one built SPA's static
+output (`control-plane/public/`, the `vite build` artifact) off the same Fastify process already
+handling `/api/*`:
 
 ```js
 fastify.register(require('@fastify/static'), { root: path.join(__dirname, 'public') })
@@ -212,10 +213,15 @@ fastify.get('/sessions/new', (req, reply) => reply.sendFile('index.html'))
 fastify.get('/sessions/:id', (req, reply) => reply.sendFile('index.html'))
 ```
 
-`index.html` is a single vanilla-JS file (no framework, no bundler — a build step would be the actual
-overengineering risk here) that calls the existing `/api/*` endpoints and opens the existing
-`GET /api/ws/sessions/:id` WebSocket. Static assets don't count against the LOC budget (§1); only the
-hand-written SPA JS does (see §14).
+**Corrected — no longer a deviation from production:** the dashboard is a **React + TypeScript SPA**
+built with Vite, styled with Tailwind v4, using shadcn/ui (Radix) primitives for accessible interactive
+components (dialogs, tabs, dropdowns) and TanStack Query for REST data-fetching/cache invalidation. It
+calls the existing `/api/*` endpoints and opens the existing `GET /api/ws/sessions/:id` WebSocket, same
+contract as before — only the implementation substrate changed, not the API surface. This matches
+production's own stack instead of deviating from it (see §13's corrected deviations table).
+Not a black-box dependency chain: shadcn/ui components are vendored into the repo at generation time,
+not pulled in as an opaque npm package. The `vite build` output (static JS/CSS bundles) doesn't count
+against the LOC budget (§1) — only hand-authored control-plane server code does (see §14).
 
 **Dashboard auth:** browser login is `openid-client`'s Authorization Code + PKCE flow against the same
 external OIDC provider service clients use, with `@fastify/secure-session` for the browser cookie —
@@ -750,14 +756,15 @@ last-active age, to avoid removing an actively-running session's volume/containe
 | GitHub webhook signature lib | Raw `node:crypto` HMAC compare | No library needed for HMAC-SHA256 |
 | Open-ended `GET /models` provider catalog | Static, hand-curated allowlist (`config.js`), **UI-only — not a server-side validation gate** | **Confirmed** — production uses a static list too (not every LiteLLM-known model is exposed/approved) and validates `model` fields on syntax alone, never catalog membership; matched exactly, not narrowed further |
 | Container log aggregation to OpenSearch (dashboard's "Open full logs in OpenSearch" link) | **Not built** — `docker logs --tail N` only | No log-aggregation stack in a single-Docker-host design; acceptable loss of a deep-link convenience feature, not a functional gap (raw logs are still fully retrievable via `sandbox/logs`) |
-| React/Vite/Tailwind dashboard | Static vanilla-JS SPA, no framework/bundler (§5) | A build toolchain is unjustified weight for three routes on a `<1000 LOC` budget — same 3 routes, same REST/WS API underneath, deliberately less sophisticated UI stack |
 | `continuationReason: workspace_origin_mismatch` | **Not reachable, omitted from enum** | No org-wide repo-access model to mismatch against |
 | `additionalRepos` / `readOrgRepos` session-creation fields | **Not built — permanent deviation** | Multi-repo/org-wide read grants are real complexity (extra clone/mount/token-scoping logic) with no need on a single-tenant host where the operator already controls repo access directly |
 
 **Kept as-is (genuinely necessary, not overengineering):** the three-layer `opencode` config system
 (native opencode behavior); all six WebSocket message types; session continuation
 (predecessor/successor tracking); the GitHub `issue_comment` webhook trigger; the dashboard SPA (now
-built as a static-file route on the same Fastify process — see §5 — not a separate service).
+built as a static-file route on the same Fastify process — see §5 — same 3 routes, same REST/WS API
+underneath, and, as of the correction above, the same React/Vite/Tailwind stack production itself uses
+— no longer a deviation).
 
 ---
 
@@ -785,7 +792,7 @@ technology, and its task, cross-referenced against `ai-coding-agent-doc.md`'s ow
 | GitHub integration | GitHub webhook (`issue_comment`), built-in `create-pull-request`/`create-issue-comment` tools (image-baked) | Identical trust/prompt-construction logic to source doc; SHA-pinned clones instead of branch checkouts (§10) |
 | GitHub host | Configurable via `GITHUB_URL` env var (same name as production) | `github.com`/GHDR by default for this deployment; GHES supported at the code level too — deployment constraint, not a code constraint (§12) |
 | Agent/harness abstraction | Deliberately not built (declared YAGNI deviation) | Direct `opencode serve` integration only — no harness-abstraction seam, since only one harness exists today (§8, §13) |
-| Dashboard | Static vanilla-JS SPA (`@fastify/static`, no framework/bundler) | Declared deviation from production's React/Vite/Tailwind stack — same 3 routes, same REST/WS API underneath (§5, §13) |
+| Dashboard | React + TypeScript SPA (Vite build, Tailwind v4, shadcn/ui, TanStack Query) | Matches production's own stack (§13 — no longer a declared deviation); built output served by `@fastify/static`, same 3 routes, same REST/WS API underneath (§5) |
 | Network/security model | Two Docker networks (`sandbox-net` internal, `egress-net` NAT'd) + Caddy as sole bridge | Structural secret-custody boundary — sandbox containers can never reach the internet directly (§12) |
 | Log access | `docker logs --tail N` only (no aggregation backend) | Declared deviation from production's OpenSearch-backed log aggregation — raw logs still fully retrievable, just no deep-link/search UI (§13) |
 
@@ -812,8 +819,13 @@ config-layering system).
 | Auth (`openid-client` config + `/oauth2/token` proxy + introspection bearer verify + internal token) | ~40-55 |
 | Bridge (small HTTP server + healthcheck-gated readiness) | ~50-70 |
 | Proxy config glue (Caddyfile) | ~25 |
-| Dashboard (static-file routes + login/cookie-auth branch; vanilla-JS SPA itself doesn't count, §1) | ~40-60 |
+| Dashboard (static-file routes + login/cookie-auth branch on the server side) | ~40-60 |
 | **Total** | **~690-850**, comfortably under the 1000 LOC ceiling |
+
+**The dashboard's own React/TypeScript source (components, hooks, Tailwind classes) is not part of
+this table** — it's UI code, not control-plane application logic (§1's scope boundary), same as it
+would have been under the previously-planned vanilla-JS SPA. Only the ~40-60 LOC of *server-side*
+routes/auth glue above counts.
 
 **Cut priority if the ceiling is threatened during implementation** (least damaging to core UX first):
 1. Narrow `fetch_history` to a single fixed-size batch instead of full pagination

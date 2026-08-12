@@ -333,7 +333,13 @@ stays separate given its own tab structure. No new endpoints — purely a layout
 
 ## Implementation note
 
-None of this requires a framework or build step (ARCHITECTURE.md §5/§13: vanilla-JS SPA, no
-React/Vite/Tailwind, unlike production's dashboard stack). Each panel above is a small, independent
-`fetch`/WS-driven DOM update — the wireframes define *what* to render, not *how* (no component library
-assumed).
+The dashboard is a **React + TypeScript SPA** built with Vite, styled with Tailwind v4, using
+shadcn/ui (Radix) primitives for the interactive chrome (dialogs, tabs, dropdowns) and TanStack Query
+for REST data-fetching/cache invalidation (ARCHITECTURE.md §5 — corrected from an earlier vanilla-JS,
+no-framework draft; this now matches production's own stack instead of deliberately deviating from
+it, see §13). Each panel above is still a small, independent, `fetch`/WS-driven unit — the wireframes
+define *what* to render, not *how* — but is now implemented as a React component rather than a raw DOM
+update, which matters specifically for this screen's concurrency: SSE token deltas, WS `presence`
+broadcasts, and cursor-paginated history all update independently and concurrently within the same
+session-detail view, which is exactly the state-synchronization problem a component/render model
+exists to handle cleanly.
