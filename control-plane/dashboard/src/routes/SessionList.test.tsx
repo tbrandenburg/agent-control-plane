@@ -14,7 +14,7 @@ function makeSession(id: string, status = 'active') {
     title: `Session ${id}`,
     repoOwner: 'acme',
     repoName: 'widgets',
-    model: 'litellm/model',
+    model: 'opencode/big-pickle',
     reasoningEffort: null,
     status,
     containerName: null,

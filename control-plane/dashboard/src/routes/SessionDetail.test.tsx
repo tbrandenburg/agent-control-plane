@@ -203,9 +203,7 @@ describe('SessionDetail — archived composer', () => {
     renderSessionDetail('s1');
 
     await waitFor(() =>
-      expect(
-        screen.getByText(/this session is archived/i),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/this session is archived/i)).toBeInTheDocument(),
     );
 
     expect(
@@ -228,9 +226,7 @@ describe('SessionDetail — archived composer', () => {
     renderSessionDetail('s1');
 
     await waitFor(() =>
-      expect(
-        screen.getByRole('button', { name: /send/i }),
-      ).toBeInTheDocument(),
+      expect(screen.getByRole('button', { name: /send/i })).toBeInTheDocument(),
     );
 
     expect(

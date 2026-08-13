@@ -173,7 +173,7 @@ describe('Transcript', () => {
             sessionID: 's1',
             error: {
               name: 'UnknownError',
-              data: { message: 'Model not found: litellm/stub-model' },
+              data: { message: 'Model not found: opencode/stub-model' },
             },
           },
         }),
@@ -184,7 +184,7 @@ describe('Transcript', () => {
 
     const alerts = screen.getAllByRole('alert');
     const errorAlert = alerts.find((el) =>
-      el.textContent?.includes('Model not found: litellm/stub-model'),
+      el.textContent?.includes('Model not found: opencode/stub-model'),
     );
     expect(errorAlert).toBeDefined();
     // Must be visible without needing to toggle "Show raw events".
