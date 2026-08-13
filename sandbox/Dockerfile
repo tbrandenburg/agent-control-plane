@@ -24,4 +24,12 @@ HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=5 \
 
 # `opencode serve` runs in the background; the bridge is the foreground process so its exit stops
 # the container. No process supervisor — YAGNI for a single-sandbox, single-attempt Phase 1.
-CMD ["sh", "-c", "opencode serve --hostname 127.0.0.1 --port 4096 & exec node bridge.js"]
+#
+# `opencode serve` has no `--dir`/`--cwd` flag (verified via `opencode serve --help`) — its
+# session working directory is purely its process cwd at launch. It must be launched from
+# `/workspace/repo` (the bootstrapped, bind-mounted target repo — sandbox.js's `:ro` mount) so the
+# agent defaults to operating on the target repo instead of the bridge's own `/app` (GitHub issue
+# #9). The bridge itself still needs cwd `/app` to resolve its `node_modules` (`npm install` ran
+# there), so it's launched from a separate `cd /app &&` clause rather than sharing `opencode
+# serve`'s subshell.
+CMD ["sh", "-c", "(cd /workspace/repo && opencode serve --hostname 127.0.0.1 --port 4096) & cd /app && exec node bridge.js"]
