@@ -456,17 +456,22 @@ export function registerSessionsRoutes(
       db.prepare('SELECT * FROM sessions').all()
     );
 
-    for (const row of rows) {
-      if (!row.container_name) continue;
-      try {
-        await sandbox.stop(row.container_name);
-      } catch (err) {
-        req.log?.error?.(
-          { err, containerName: row.container_name },
-          'failed to stop sandbox container while clearing all sessions',
-        );
-      }
-    }
+    // Stop containers concurrently, not sequentially — a `docker stop` against an
+    // already-gone container can take several seconds to fail, and this endpoint may be
+    // clearing dozens of stale rows at once (verified live: sequential awaits made this
+    // endpoint take 100+ seconds with ~20 stale sessions).
+    await Promise.allSettled(
+      rows
+        .filter((row) => row.container_name)
+        .map((row) =>
+          sandbox.stop(row.container_name).catch((err) => {
+            req.log?.error?.(
+              { err, containerName: row.container_name },
+              'failed to stop sandbox container while clearing all sessions',
+            );
+          }),
+        ),
+    );
 
     db.prepare(
       'DELETE FROM events WHERE session_id IN (SELECT id FROM sessions)',
