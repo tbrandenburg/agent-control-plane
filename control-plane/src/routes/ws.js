@@ -9,7 +9,7 @@ import { promptSession } from '../prompt-session.js';
 /**
  * Module-level subscriber registry: `sessionId -> Set<WebSocket>`. Lives for the process
  * lifetime; entries are added on a successful `subscribe` and removed on socket `close`.
- * @type {Map<string, Set<import('ws').WebSocket>>}
+ * @type {Map<string, Set<{send(data: string): void, close(code?: number): void, on(event: string, listener: (...args: unknown[]) => void): void}>>}
  */
 const subscribers = new Map();
 
@@ -33,7 +33,7 @@ export function broadcastToSession(sessionId, payload) {
 /**
  * Adds `socket` to `sessionId`'s subscriber set, creating the set if needed.
  * @param {string} sessionId - Session id to subscribe to.
- * @param {import('ws').WebSocket} socket - Socket to register.
+ * @param {{send(data: string): void, close(code?: number): void, on(event: string, listener: (...args: unknown[]) => void): void}} socket - Socket to register.
  * @returns {void}
  */
 function addSubscriber(sessionId, socket) {
@@ -49,7 +49,7 @@ function addSubscriber(sessionId, socket) {
  * Removes `socket` from `sessionId`'s subscriber set, deleting the set entirely once empty so
  * the registry never accumulates dead session keys.
  * @param {string} sessionId - Session id to unsubscribe from.
- * @param {import('ws').WebSocket} socket - Socket to remove.
+ * @param {{send(data: string): void, close(code?: number): void, on(event: string, listener: (...args: unknown[]) => void): void}} socket - Socket to remove.
  * @returns {void}
  */
 function removeSubscriber(sessionId, socket) {
@@ -81,52 +81,56 @@ export function registerWsRoutes(
     const { id } = /** @type {{id: string}} */ (req.params);
     let subscribed = false;
 
-    socket.on('message', (raw) => {
-      let message;
-      try {
-        message = JSON.parse(raw.toString());
-      } catch {
-        socket.close(CLOSE_UNAUTHORIZED);
-        return;
-      }
-
-      const type = message?.type;
-
-      if (type === 'subscribe') {
-        // `subscribe` is a hard precondition (never logged: the plaintext `wsToken` must not
-        // appear anywhere, including error logs).
-        const row = /** @type {{ws_token: string}|undefined} */ (
-          db.prepare('SELECT ws_token FROM sessions WHERE id = ?').get(id)
-        );
-        if (!row || row.ws_token !== message.wsToken) {
+    socket.on(
+      'message',
+      /** @param {Buffer} raw */ (raw) => {
+        if (!(raw instanceof Buffer)) return;
+        let message;
+        try {
+          message = JSON.parse(raw.toString());
+        } catch {
           socket.close(CLOSE_UNAUTHORIZED);
           return;
         }
-        subscribed = true;
-        addSubscriber(id, socket);
-        return;
-      }
 
-      if (!subscribed) {
+        const type = message?.type;
+
+        if (type === 'subscribe') {
+          // `subscribe` is a hard precondition (never logged: the plaintext `wsToken` must not
+          // appear anywhere, including error logs).
+          const row = /** @type {{ws_token: string}|undefined} */ (
+            db.prepare('SELECT ws_token FROM sessions WHERE id = ?').get(id)
+          );
+          if (!row || row.ws_token !== message.wsToken) {
+            socket.close(CLOSE_UNAUTHORIZED);
+            return;
+          }
+          subscribed = true;
+          addSubscriber(id, socket);
+          return;
+        }
+
+        if (!subscribed) {
+          socket.close(CLOSE_UNAUTHORIZED);
+          return;
+        }
+
+        if (type === 'ping') {
+          socket.send(JSON.stringify({ type: 'pong' }));
+          return;
+        }
+
+        if (type === 'prompt') {
+          const { type: _type, ...body } = message;
+          promptSession(db, fetchImpl, id, body).then((result) => {
+            socket.send(JSON.stringify({ type: 'prompt-result', ...result }));
+          });
+          return;
+        }
+
         socket.close(CLOSE_UNAUTHORIZED);
-        return;
-      }
-
-      if (type === 'ping') {
-        socket.send(JSON.stringify({ type: 'pong' }));
-        return;
-      }
-
-      if (type === 'prompt') {
-        const { type: _type, ...body } = message;
-        promptSession(db, fetchImpl, id, body).then((result) => {
-          socket.send(JSON.stringify({ type: 'prompt-result', ...result }));
-        });
-        return;
-      }
-
-      socket.close(CLOSE_UNAUTHORIZED);
-    });
+      },
+    );
 
     socket.on('close', () => {
       if (subscribed) removeSubscriber(id, socket);

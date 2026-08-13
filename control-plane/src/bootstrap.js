@@ -7,6 +7,8 @@
 import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 
+/** @typedef {Error & {stderr?: string, classification?: string, role?: string}} GitError */
+
 /**
  * Runs `git <args>` via `spawn` (never a shell string), collecting stdout/stderr.
  * @param {string[]} args - Argv passed to `git`.
@@ -19,6 +21,14 @@ function runGit(args, cwd) {
     const child = spawn('git', args, cwd ? { cwd } : undefined);
     let stdout = '';
     let stderr = '';
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      const error = /** @type {GitError} */ (
+        new Error(`git ${args[0]} timed out after 10000ms`)
+      );
+      error.stderr = error.message;
+      reject(error);
+    }, 10000);
     child.stdout.on('data', (chunk) => {
       stdout += chunk;
     });
@@ -27,13 +37,14 @@ function runGit(args, cwd) {
     });
     child.on('error', (err) => reject(err));
     child.on('close', (code) => {
+      clearTimeout(timer);
       if (code === 0) {
         resolve(stdout.trim());
         return;
       }
       const cleanStderr = stripCredentialsFromText((stderr || stdout).trim());
-      const error = new Error(
-        cleanStderr || `git ${args[0]} exited with code ${code}`,
+      const error = /** @type {GitError} */ (
+        new Error(cleanStderr || `git ${args[0]} exited with code ${code}`)
       );
       error.stderr = cleanStderr;
       reject(error);
@@ -63,7 +74,7 @@ export function classifyGitFailure(stderr) {
   if (/authentication failed|invalid username or token/i.test(text))
     return 'auth';
   if (
-    /could not resolve host|failed to connect|couldn't connect to server|timed out/i.test(
+    /could not resolve host|failed to connect|couldn't connect to server|timed out|timeout/i.test(
       text,
     )
   ) {
@@ -85,12 +96,15 @@ export async function resolveSha(repoUrl, ref) {
   try {
     stdout = await runGit(['ls-remote', repoUrl, ref]);
   } catch (err) {
-    err.classification = classifyGitFailure(err.stderr);
-    throw err;
+    const error = /** @type {GitError} */ (err);
+    error.classification = classifyGitFailure(error.stderr ?? '');
+    throw error;
   }
-  const sha = stdout.split(/\s+/, 1)[0];
+  const sha = stdout.split(/\s+/, 1)[0] ?? '';
   if (!sha) {
-    const error = new Error(`ref '${ref}' not found on ${repoUrl}`);
+    const error = /** @type {GitError} */ (
+      new Error(`ref '${ref}' not found on ${repoUrl}`)
+    );
     error.classification = 'not_found';
     throw error;
   }
@@ -125,8 +139,10 @@ export async function cloneAndCheckout(
     await runGit(['fetch', '--depth', '1', 'origin', sha], destPath);
     await runGit(['checkout', sha], destPath);
   } catch (err) {
-    err.classification = err.classification ?? classifyGitFailure(err.stderr);
-    throw err;
+    const error = /** @type {GitError} */ (err);
+    error.classification =
+      error.classification ?? classifyGitFailure(error.stderr ?? '');
+    throw error;
   }
 }
 
@@ -199,6 +215,7 @@ export async function bootstrapWorkspace(session, baseDir) {
     });
   }
 
+  /** @type {{targetDir: string|null, platformConfigDir: string|null, teamConfigDir: string|null}} */
   const layout = {
     targetDir: null,
     platformConfigDir: null,
@@ -212,20 +229,31 @@ export async function bootstrapWorkspace(session, baseDir) {
       await cloneAndCheckout(repo.url, sha, dir, { sparse });
       await stripCredential(dir);
     } catch (err) {
-      if (optional && err.classification === 'not_found') {
+      const error = /** @type {GitError} */ (err);
+      if (optional && error.classification === 'not_found') {
         continue;
       }
-      const error = new Error(
-        `bootstrap failed for ${role} repo: ${err.message}`,
+      const bootstrapError = new Error(
+        `bootstrap failed for ${role} repo: ${error.message}`,
       );
-      error.role = role;
-      error.classification = err.classification ?? 'unknown';
-      throw error;
+      /** @type {GitError} */ (bootstrapError).role = role;
+      /** @type {GitError} */ (bootstrapError).classification =
+        error.classification ?? 'unknown';
+      throw bootstrapError;
     }
     if (role === 'target') layout.targetDir = dir;
     if (role === 'platform') layout.platformConfigDir = dir;
     if (role === 'team') layout.teamConfigDir = dir;
   }
 
-  return layout;
+  if (!layout.targetDir || !layout.platformConfigDir) {
+    throw new Error(
+      'bootstrap did not produce required repository directories',
+    );
+  }
+  return {
+    targetDir: layout.targetDir,
+    platformConfigDir: layout.platformConfigDir,
+    teamConfigDir: layout.teamConfigDir,
+  };
 }

@@ -58,5 +58,7 @@ export async function promptSession(db, fetchImpl, id, body) {
   }
 
   const payload = await bridgeRes.json().catch(() => ({}));
-  return { status: bridgeRes.status, body: payload };
+  const bodyPayload =
+    payload && typeof payload === 'object' ? payload : { data: payload };
+  return { status: bridgeRes.status, body: bodyPayload };
 }

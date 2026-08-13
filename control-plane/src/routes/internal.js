@@ -29,7 +29,8 @@ export function registerInternalRoutes(app, db) {
       'INSERT INTO events (session_id, timestamp, payload) VALUES (?, ?, ?)',
     ).run(id, new Date().toISOString(), JSON.stringify(req.body ?? {}));
 
-    broadcastToSession(id, { type: 'event', ...req.body });
+    const event = req.body && typeof req.body === 'object' ? req.body : {};
+    broadcastToSession(id, { type: 'event', ...event });
 
     reply.code(201);
     return { status: 'stored' };

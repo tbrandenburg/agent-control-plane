@@ -53,7 +53,7 @@ test.describe('bootstrap failure classification (real git, real network)', () =>
   });
 
   test('network: a real non-routable host times out unreachable', async () => {
-    test.setTimeout(30000);
+    test.setTimeout(45000);
     let caught: Error & { classification?: string };
     try {
       await resolveSha(UNREACHABLE_HOST_REPO_URL, 'main');

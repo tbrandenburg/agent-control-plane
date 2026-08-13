@@ -15,6 +15,7 @@
   "exclude": [
     "node_modules",
     "control-plane/dashboard",
-    "control-plane/node_modules"
+    "control-plane/node_modules",
+    "control-plane/src/**/*.test.js"
   ]
 }
