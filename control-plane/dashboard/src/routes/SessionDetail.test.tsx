@@ -253,3 +253,33 @@ describe('SessionDetail — archived composer', () => {
     expect(FakeWebSocket.instances).toHaveLength(0);
   });
 });
+
+describe('SessionDetail — pending_bootstrap composer', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    FakeWebSocket.instances = [];
+  });
+
+  it('disables the composer and shows a starting-up hint while pending_bootstrap', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
+      if (String(url).includes('/api/models'))
+        return jsonResponse({ models: [] });
+      return jsonResponse({
+        ...SESSION_BODY,
+        status: 'pending_bootstrap',
+        containerName: null,
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderSessionDetail('s1');
+
+    await waitFor(() =>
+      expect(screen.getByText(/still starting up/i)).toBeInTheDocument(),
+    );
+
+    expect(screen.getByRole('button', { name: /send/i })).toBeDisabled();
+  });
+});

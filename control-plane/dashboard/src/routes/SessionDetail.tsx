@@ -80,6 +80,7 @@ export function SessionDetail({ id }: { id: string }) {
   }
 
   const archived = session.status === 'archived';
+  const pendingBootstrap = session.status === 'pending_bootstrap';
 
   return (
     <div>
@@ -148,13 +149,20 @@ export function SessionDetail({ id }: { id: string }) {
               This session is archived. Create a new session to continue.
             </p>
           ) : (
-            <PromptComposer
-              models={modelsData?.models ?? []}
-              defaultModel={session.model ?? undefined}
-              defaultReasoningEffort={session.reasoningEffort ?? undefined}
-              disabled={sendPrompt.isPending}
-              onSubmit={(input) => sendPrompt.mutateAsync(input)}
-            />
+            <>
+              {pendingBootstrap && (
+                <p className="px-4 pt-2 text-sm text-muted-foreground">
+                  Sandbox is still starting up…
+                </p>
+              )}
+              <PromptComposer
+                models={modelsData?.models ?? []}
+                defaultModel={session.model ?? undefined}
+                defaultReasoningEffort={session.reasoningEffort ?? undefined}
+                disabled={sendPrompt.isPending || pendingBootstrap}
+                onSubmit={(input) => sendPrompt.mutateAsync(input)}
+              />
+            </>
           )}
         </div>
 

@@ -42,6 +42,9 @@ export async function promptSession(db, fetchImpl, id, body) {
   const reasoningEffort = body.reasoningEffort ?? row.reasoning_effort;
 
   if (!row.container_name) {
+    if (row.status === 'pending_bootstrap') {
+      return { status: 503, body: { error: 'SANDBOX_STARTING' } };
+    }
     return { status: 503, body: { error: 'SANDBOX_UNAVAILABLE' } };
   }
 
