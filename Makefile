@@ -1,4 +1,4 @@
-.PHONY: help install run stop test lint build clean loc e2e typecheck sandbox-image deploy release
+.PHONY: help install run stop test lint build clean loc e2e typecheck sandbox-image deploy release dev-stack dev-stack-down
 
 ## Default target — list all available targets.
 help:
@@ -62,6 +62,44 @@ e2e:
 ## Type-check all workspaces with tsc (no build step).
 typecheck:
 	pnpm run typecheck:all
+
+## Bring up an isolated, ad-hoc verification stack safe to run alongside an already-running
+## default stack: picks a free host port and uses a unique compose project name + SANDBOX_NETWORK
+## so it never collides with another project's fixed-name `egress-net` or port bindings. Prints
+## the URL and the `make dev-stack-down` command once healthy. Only smoke.spec.ts is safe to run
+## against it (session-lifecycle.spec.ts hardcodes ../data/control-plane.db, the default stack's DB).
+dev-stack:
+	@project="acp-dev-$$(date +%s)"; \
+	port=3400; \
+	while ss -ltn 2>/dev/null | grep -q ":$$port "; do port=$$((port + 1)); done; \
+	network="$${project}-net"; \
+	echo "Starting isolated stack: project=$$project port=$$port network=$$network"; \
+	SANDBOX_NETWORK="$$network" HOST_PORT="$$port" GIT_SHA=$$(git rev-parse HEAD) \
+		docker compose -p "$$project" up -d --build; \
+	echo "$$project" > .dev-stack-last; \
+	timeout=60; \
+	until curl -sf "http://localhost:$$port/health" > /dev/null 2>&1; do \
+		timeout=$$((timeout - 1)); \
+		if [ $$timeout -le 0 ]; then \
+			echo "ERROR: control-plane did not become healthy within 60s" >&2; \
+			docker compose -p "$$project" logs; \
+			exit 1; \
+		fi; \
+		sleep 1; \
+	done; \
+	echo "Ready: http://localhost:$$port  (project: $$project)"; \
+	echo "Tear down with: make dev-stack-down"
+
+## Tear down a stack started by `make dev-stack` (defaults to the most recently started one;
+## pass PROJECT=<name> to target a specific one).
+dev-stack-down:
+	@project="$(PROJECT)"; \
+	if [ -z "$$project" ]; then \
+		if [ -f .dev-stack-last ]; then project=$$(cat .dev-stack-last); \
+		else echo "ERROR: no PROJECT given and no .dev-stack-last found" >&2; exit 1; fi; \
+	fi; \
+	docker compose -p "$$project" down -v; \
+	rm -f .dev-stack-last
 
 ## Build the sandbox image (agent-sandbox:local) used by control-plane/src/sandbox.js.
 sandbox-image:

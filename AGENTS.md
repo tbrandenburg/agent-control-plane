@@ -11,6 +11,20 @@
 - [Phase 0 — Project Setup](docs/phase_00_plan.md)
 - [Phase 1 — Spawn an Agent From the Dashboard](docs/phase_01_plan.md)
 
+## Make targets
+
+Run `make help` for the full list. Most common:
+
+- `make install` — install all workspace deps
+- `make run` — start the control-plane server (no Docker)
+- `make test` / `make lint` / `make typecheck` — unit+integration tests / biome / tsc
+- `make e2e` — build sandbox image, bring up the real docker compose stack, run Playwright, tear down
+- `make dev-stack` / `make dev-stack-down` — isolated, ad-hoc verification stack (unique port +
+  compose project + `SANDBOX_NETWORK`) safe to run alongside another already-running stack; only
+  `smoke.spec.ts` is safe against it (`session-lifecycle.spec.ts` reads the default stack's DB directly)
+- `make deploy` — rebuild+redeploy control-plane with the current commit's `GIT_SHA` baked in
+- `make release BUMP=patch|minor|major` — bump version, tag, push, cut a GitHub release
+
 ## Validation Conventions
 
 - **Model-resolution / config-composition changes require a real E2E gate in the same step.**

@@ -16,3 +16,4 @@ test-results/
 playwright-report/
 .playwright-mcp/
 .worktrees/
+.dev-stack-last
