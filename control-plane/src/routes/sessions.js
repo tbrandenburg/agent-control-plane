@@ -3,8 +3,10 @@
  * `POST /api/sessions` (creates the row synchronously with `status = 'pending_bootstrap'` and kicks
  * off sandbox bootstrap asynchronously in the background, updating `status` to `'active'` or
  * `'pending_bootstrap-failed'` once bootstrap settles), `POST /api/sessions/:id/stop` (stops and
- * removes the sandbox container), `PATCH /api/sessions/:id` (updates mutable session fields), and
- * `POST /api/sessions/:id/prompt` (synchronous proxy to the bridge).
+ * removes the sandbox container), `PATCH /api/sessions/:id` (updates mutable session fields),
+ * `POST /api/sessions/:id/prompt` (synchronous proxy to the bridge), and `DELETE /api/sessions`
+ * (bulk cleanup: best-effort container teardown per session, then deletes all sessions + events
+ * rows).
  */
 
 import { randomUUID } from 'node:crypto';
@@ -430,5 +432,34 @@ export function registerSessionsRoutes(
     const result = await promptSession(db, fetchImpl, id, body);
     reply.code(result.status);
     return result.body;
+  });
+
+  // Bulk cleanup (issue #29): best-effort stop/remove any live containers, then delete all
+  // `sessions` rows and their `events` history. No FK `ON DELETE CASCADE` exists on `events`
+  // (`002_sessions_events.sql`), so events are deleted explicitly per session before the row
+  // itself, mirroring the archive handler's non-fatal container-teardown pattern above.
+  app.delete('/api/sessions', async (req, _reply) => {
+    const rows = /** @type {SessionRow[]} */ (
+      db.prepare('SELECT * FROM sessions').all()
+    );
+
+    for (const row of rows) {
+      if (!row.container_name) continue;
+      try {
+        await sandbox.stop(row.container_name);
+      } catch (err) {
+        req.log?.error?.(
+          { err, containerName: row.container_name },
+          'failed to stop sandbox container while clearing all sessions',
+        );
+      }
+    }
+
+    db.prepare(
+      'DELETE FROM events WHERE session_id IN (SELECT id FROM sessions)',
+    ).run();
+    const result = db.prepare('DELETE FROM sessions').run();
+
+    return { deleted: result.changes };
   });
 }

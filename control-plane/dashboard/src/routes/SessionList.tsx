@@ -4,7 +4,7 @@
  * currently derives from `sessions.status` alone with `dockerPhase: null`.
  */
 import { useState } from 'react';
-import { type Session, useSessions } from '@/api/client';
+import { type Session, useDeleteAllSessions, useSessions } from '@/api/client';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/lib/router';
@@ -22,6 +22,8 @@ export function SessionList() {
   const [status, setStatus] = useState('');
   const [offset, setOffset] = useState(0);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [confirmingClear, setConfirmingClear] = useState(false);
+  const deleteAllSessions = useDeleteAllSessions();
 
   const { data, isLoading, isError, error, isFetching } = useSessions({
     status: status || undefined,
@@ -47,6 +49,17 @@ export function SessionList() {
 
   function handleLoadMore() {
     setOffset((prev) => prev + PAGE_SIZE);
+  }
+
+  function handleClearAll() {
+    deleteAllSessions.mutate(undefined, {
+      onSuccess: () => {
+        setSessions([]);
+        setOffset(0);
+        setLoadedKey(null);
+        setConfirmingClear(false);
+      },
+    });
   }
 
   const canLoadMore = (data?.sessions.length ?? 0) === PAGE_SIZE;
@@ -135,6 +148,59 @@ export function SessionList() {
           >
             {isFetching ? 'Loading…' : 'Load more'}
           </Button>
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-col items-end gap-2">
+        {deleteAllSessions.isError && (
+          <p className="text-sm text-red-600">
+            {deleteAllSessions.error.message}
+          </p>
+        )}
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={deleteAllSessions.isPending}
+          onClick={() => setConfirmingClear(true)}
+        >
+          {deleteAllSessions.isPending ? 'Clearing…' : 'Clear all sessions'}
+        </Button>
+      </div>
+
+      {confirmingClear && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="clear-sessions-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        >
+          <div className="w-full max-w-sm rounded-md border bg-background p-4 shadow-lg">
+            <h3 id="clear-sessions-title" className="text-base font-medium">
+              Clear all sessions?
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This permanently deletes every session and its history. This
+              cannot be undone.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={deleteAllSessions.isPending}
+                onClick={() => setConfirmingClear(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={deleteAllSessions.isPending}
+                onClick={handleClearAll}
+              >
+                {deleteAllSessions.isPending ? 'Clearing…' : 'Clear all'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
