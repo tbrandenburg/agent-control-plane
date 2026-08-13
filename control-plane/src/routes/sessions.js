@@ -1,21 +1,25 @@
 /**
- * Sessions API — reads (`GET /api/sessions`, `GET /api/sessions/:id`, `GET /api/sessions/:id/events`)
- * plus `POST /api/sessions` (synchronous sandbox bootstrap) and `POST /api/sessions/:id/prompt`
- * (synchronous proxy to the bridge). `/stop` and `PATCH` remain out of scope for this phase.
+ * Sessions API — reads (`GET /api/sessions`, `GET /api/sessions/:id`, `GET /api/sessions/:id/events`),
+ * `POST /api/sessions` (creates the row synchronously with `status = 'pending_bootstrap'` and kicks
+ * off sandbox bootstrap asynchronously in the background, updating `status` to `'active'` or
+ * `'pending_bootstrap-failed'` once bootstrap settles), `POST /api/sessions/:id/stop` (stops and
+ * removes the sandbox container), `PATCH /api/sessions/:id` (updates mutable session fields), and
+ * `POST /api/sessions/:id/prompt` (synchronous proxy to the bridge).
  */
 
 import { randomUUID } from 'node:crypto';
+import * as defaultBootstrap from '../bootstrap.js';
 import {
   isValidModelReference,
   isValidRepoSegment,
   isValidTitle,
 } from '../model.js';
+import { promptSession } from '../prompt-session.js';
 import * as defaultSandbox from '../sandbox.js';
+import { spawnSandbox } from '../spawn-session.js';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
-/** Port the bridge listens on inside the sandbox (matches `sandbox/bridge.js`'s own default). */
-const DEFAULT_BRIDGE_PORT = 8080;
 
 /**
  * @typedef {object} SessionRow
@@ -123,6 +127,7 @@ function parseNonNegativeInt(value, fallback) {
 /**
  * @typedef {object} SessionsRoutesDeps
  * @property {typeof defaultSandbox} [sandbox] - Sandbox lifecycle module, swappable in tests.
+ * @property {typeof defaultBootstrap} [bootstrap] - Bootstrap module, swappable in tests.
  * @property {typeof fetch} [fetchImpl] - `fetch` implementation, swappable in tests.
  */
 
@@ -136,7 +141,11 @@ function parseNonNegativeInt(value, fallback) {
 export function registerSessionsRoutes(
   app,
   db,
-  { sandbox = defaultSandbox, fetchImpl = (...args) => fetch(...args) } = {},
+  {
+    sandbox = defaultSandbox,
+    bootstrap = defaultBootstrap,
+    fetchImpl = (...args) => fetch(...args),
+  } = {},
 ) {
   app.get('/api/sessions', async (req, reply) => {
     const query = /** @type {Record<string, unknown>} */ (req.query ?? {});
@@ -234,7 +243,14 @@ export function registerSessionsRoutes(
 
   app.post('/api/sessions', async (req, reply) => {
     const body = /** @type {Record<string, unknown>} */ (req.body ?? {});
-    const { title, repoOwner, repoName, model, reasoningEffort } = body;
+    const {
+      title,
+      repoOwner,
+      repoName,
+      model,
+      reasoningEffort,
+      teamConfigRepo,
+    } = body;
 
     if (
       typeof title !== 'string' ||
@@ -271,36 +287,45 @@ export function registerSessionsRoutes(
       reply.code(400);
       return { error: 'INVALID_SESSION_BODY' };
     }
-
-    const id = randomUUID();
-    db.prepare(
-      `INSERT INTO sessions
-        (id, title, repo_owner, repo_name, model, reasoning_effort, status)
-       VALUES (?, ?, ?, ?, ?, ?, 'active')`,
-    ).run(id, title, repoOwner, repoName, model, reasoningEffort ?? null);
-
-    // Synchronous bootstrap this phase — no `setImmediate` split (this step's Decisions).
-    let containerName;
-    try {
-      const started = await sandbox.run({ id, model });
-      containerName = started.containerName;
-      await sandbox.waitForHealth(containerName);
-    } catch (err) {
-      reply.code(500);
-      return {
-        error: err instanceof Error ? err.message : String(err),
-      };
+    if (teamConfigRepo !== undefined && typeof teamConfigRepo !== 'string') {
+      reply.code(400);
+      return { error: 'INVALID_SESSION_BODY' };
     }
 
+    const id = randomUUID();
+    const wsToken = randomUUID();
     db.prepare(
-      "UPDATE sessions SET container_name = ?, updated_at = datetime('now') WHERE id = ?",
-    ).run(containerName, id);
+      `INSERT INTO sessions
+        (id, title, repo_owner, repo_name, model, reasoning_effort, status, ws_token)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending_bootstrap', ?)`,
+    ).run(
+      id,
+      title,
+      repoOwner,
+      repoName,
+      model,
+      reasoningEffort ?? null,
+      wsToken,
+    );
 
-    reply.code(201);
-    return { id };
+    // Async split (this step's Decisions): the row is already queryable and the response is
+    // already sent by the time this runs — spawn/bootstrap happens after, never blocking the
+    // request. Written generically enough for Phase 5's webhook handler to reuse verbatim.
+    setImmediate(() => {
+      spawnSandbox(db, sandbox, bootstrap, {
+        id,
+        model,
+        repoOwner,
+        repoName,
+        teamConfigRepo: teamConfigRepo || undefined,
+      });
+    });
+
+    reply.code(202);
+    return { id, wsToken };
   });
 
-  app.post('/api/sessions/:id/prompt', async (req, reply) => {
+  app.post('/api/sessions/:id/stop', async (req, reply) => {
     const { id } = /** @type {{id: string}} */ (req.params);
     const row = /** @type {SessionRow|undefined} */ (
       db.prepare('SELECT * FROM sessions WHERE id = ?').get(id)
@@ -310,40 +335,55 @@ export function registerSessionsRoutes(
       return { error: 'SESSION_NOT_FOUND' };
     }
 
-    const body = /** @type {Record<string, unknown>} */ (req.body ?? {});
-    const content = body.content;
-    if (typeof content !== 'string' || !content) {
-      reply.code(400);
-      return { error: 'INVALID_PROMPT_BODY' };
-    }
-
-    const model = body.model ?? row.model;
-    if (!isValidModelReference(model)) {
-      reply.code(400);
-      return { error: 'INVALID_MODEL_REFERENCE' };
-    }
-    const reasoningEffort = body.reasoningEffort ?? row.reasoning_effort;
-
+    // No attempted `docker stop` against a container name that was never spawned (this step's
+    // Error Handling) — a clear, immediate error instead.
     if (!row.container_name) {
-      reply.code(503);
-      return { error: 'SANDBOX_UNAVAILABLE' };
+      reply.code(409);
+      return { error: 'NO_LIVE_CONTAINER' };
     }
 
-    const bridgeUrl = `http://${row.container_name}:${DEFAULT_BRIDGE_PORT}/prompt`;
-    let bridgeRes;
     try {
-      bridgeRes = await fetchImpl(bridgeUrl, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ content, model, reasoningEffort }),
-      });
-    } catch {
-      reply.code(503);
-      return { error: 'SANDBOX_UNAVAILABLE' };
+      const result = await sandbox.stop(row.container_name);
+      return { status: 'stopped', method: result.method };
+    } catch (err) {
+      reply.code(502);
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  app.patch('/api/sessions/:id', async (req, reply) => {
+    const { id } = /** @type {{id: string}} */ (req.params);
+    const body = /** @type {Record<string, unknown>} */ (req.body ?? {});
+    const { status } = body;
+
+    // `active` <-> `archived` only this phase — no continuation-driven status values yet
+    // (this step's Implementation).
+    if (status !== 'active' && status !== 'archived') {
+      reply.code(400);
+      return { error: 'INVALID_STATUS' };
     }
 
-    const payload = await bridgeRes.json().catch(() => ({}));
-    reply.code(bridgeRes.status);
-    return payload;
+    const exists = db.prepare('SELECT 1 FROM sessions WHERE id = ?').get(id);
+    if (!exists) {
+      reply.code(404);
+      return { error: 'SESSION_NOT_FOUND' };
+    }
+
+    db.prepare(
+      "UPDATE sessions SET status = ?, updated_at = datetime('now') WHERE id = ?",
+    ).run(status, id);
+
+    const row = /** @type {SessionRow} */ (
+      db.prepare('SELECT * FROM sessions WHERE id = ?').get(id)
+    );
+    return sessionRowToJson(row);
+  });
+
+  app.post('/api/sessions/:id/prompt', async (req, reply) => {
+    const { id } = /** @type {{id: string}} */ (req.params);
+    const body = /** @type {Record<string, unknown>} */ (req.body ?? {});
+    const result = await promptSession(db, fetchImpl, id, body);
+    reply.code(result.status);
+    return result.body;
   });
 }

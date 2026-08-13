@@ -6,12 +6,14 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fastifyStatic from '@fastify/static';
+import fastifyWebsocket from '@fastify/websocket';
 import Fastify from 'fastify';
 import { loadConfig } from './config.js';
 import { openDb } from './db.js';
 import { registerInternalRoutes } from './routes/internal.js';
 import { registerModelsRoutes } from './routes/models.js';
 import { registerSessionsRoutes } from './routes/sessions.js';
+import { registerWsRoutes } from './routes/ws.js';
 
 const publicDir = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -33,6 +35,16 @@ export function buildServer() {
   app.decorate('db', db);
 
   app.get('/health', async () => ({ status: 'ok' }));
+
+  // Encapsulated so the `await` on `@fastify/websocket`'s registration completes (and its
+  // `onRoute` hook is installed) before `registerWsRoutes` declares the `{ websocket: true }`
+  // route — declaring it in the same synchronous tick as an un-awaited `register()` leaves
+  // `request.params` undefined in the handler (the plugin's route-wrapping hook isn't attached
+  // yet when the route is added).
+  app.register(async (instance) => {
+    await instance.register(fastifyWebsocket);
+    registerWsRoutes(instance, db);
+  });
 
   registerSessionsRoutes(app, db);
   registerInternalRoutes(app, db);

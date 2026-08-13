@@ -153,3 +153,21 @@ success/failure; or inject no default at all and require a real Platform config 
 including this project's own dev/e2e stack). No option was silently chosen — recorded as an open
 decision in [GitHub issue #1](https://github.com/tbrandenburg/agent-control-plane/issues/1) for
 whoever implements Phase 2.
+
+## Addendum (2026-08-13, Phase 2 Step 00602): `litellm/stub-model` reproduction path no longer resolves standalone
+
+Since Phase 2 Step `00200`'s Option C decision (`OPENCODE_CONFIG_CONTENT` now composes only
+`{model, autoupdate}`, no default provider block injected), the `litellm/stub-model` reproduction
+path this document describes above no longer resolves on its own — a real prompt against
+`litellm/stub-model` now fails with `ProviderModelNotFoundError: Model not found:
+litellm/stub-model` (`docs/phase_02_findings.md` §2), since no default `provider.litellm` block is
+injected and no real Platform config repo is cloned to supply one (tracked separately in step
+`00601`). The evidence above (e.g. the missing `models` map bug) remains historically accurate for
+the code state it describes, but is no longer reproducible standalone with the current stack.
+
+`docker-compose.yml`/`make e2e` (Step `00602`) now default to `opencode/big-pickle`, a real, free,
+zero-credential model bundled natively with opencode, as their E2E fixture — this is a fixture
+choice only, not a production model-selection decision (see step `00602`'s own scope-caution note).
+Anyone needing to exercise a real `litellm/*`-style provider block should instead pair a real
+Platform config repo fixture (step `00601`) with a correct `provider.<id>.models` map, not this
+retired `stub-model` path.

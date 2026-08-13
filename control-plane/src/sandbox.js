@@ -7,6 +7,9 @@
 
 import { spawn } from 'node:child_process';
 
+/** Port the bridge listens on inside the sandbox (matches `sandbox/bridge.js`'s own default). */
+const DEFAULT_BRIDGE_PORT = 8080;
+
 /**
  * Deterministic, greppable container name for a session (Phase 3 adds an attempt suffix on
  * continuation).
@@ -50,55 +53,63 @@ function runDocker(args) {
   });
 }
 
+/** Path inside the sandbox container opencode reads as its Global config (step 2, ARCHITECTURE.md §8). */
+const GLOBAL_CONFIG_CONTAINER_PATH = '/root/.config/opencode';
+/** Path inside the sandbox container the team config layer is mounted at (`OPENCODE_CONFIG_DIR`, step 5). */
+const TEAM_CONFIG_CONTAINER_PATH = '/workspace/team-config';
+
 /**
  * @typedef {object} SandboxSession
  * @property {string} id - Session id, used to derive the container name.
  * @property {string} model - `provider/model` string, layered into `OPENCODE_CONFIG_CONTENT`.
+ * @property {string} targetDir - Host path to the bootstrapped target repo (`bootstrapWorkspace()`'s
+ *   `targetDir`), bind-mounted read-only at `/workspace/repo`.
+ * @property {string} platformConfigDir - Host path to the bootstrapped platform config repo
+ *   (`bootstrapWorkspace()`'s `platformConfigDir`), bind-mounted at opencode's Global config
+ *   path (ARCHITECTURE.md §8 step 2) — read-write, not read-only: opencode itself writes local
+ *   state (session/auth cache) under this path even for a session that never edits config, so a
+ *   `:ro` mount here makes every session's first request fail with a 500 (verified live).
+ * @property {string|null} [teamConfigDir] - Host path to the bootstrapped team config repo
+ *   (`bootstrapWorkspace()`'s `teamConfigDir`), bind-mounted read-write for the same reason and
+ *   pointed at via `OPENCODE_CONFIG_DIR` (step 5) when present; omitted entirely when bootstrap
+ *   skipped it.
  */
 
 /**
- * Builds the minimal, non-negotiable `OPENCODE_CONFIG_CONTENT` layer (ARCHITECTURE.md §8):
- * `model`, `autoupdate: false`, and the `provider.litellm` block. In this phase `baseURL` points
- * straight at LiteLLM — PHASE-4: repointed at `http://sandbox-proxy:8080/litellm`.
- *
- * Custom (`npm`-based) opencode providers only expose models declared under their own
- * `models` map (found via this phase's E2E spec) — omitting it makes every prompt fail with
- * `Model not found`, so the session's own model id is always registered here.
+ * Builds the minimal, non-negotiable `OPENCODE_CONFIG_CONTENT` layer (ARCHITECTURE.md §8,
+ * declared correction): exactly `model` + `autoupdate: false`, nothing provider-shaped. The full
+ * provider/gateway catalog is Platform-config-repo territory (opencode's own step-2 Global
+ * config), resolved natively by opencode's 8-step precedence chain — never enumerated here (see
+ * `docs/phase_02_findings.md`'s Option C decision, GitHub issue #1).
  * @param {SandboxSession} session - Session to configure.
- * @param {NodeJS.ProcessEnv} env - Environment source for LiteLLM connection details.
  * @returns {string} JSON-stringified opencode config.
  */
-function buildOpencodeConfig(session, env) {
-  const modelID = session.model.slice(session.model.indexOf('/') + 1);
+function buildOpencodeConfig(session) {
   return JSON.stringify({
     model: session.model,
     autoupdate: false,
-    provider: {
-      litellm: {
-        npm: '@ai-sdk/openai-compatible',
-        options: {
-          baseURL: env.LITELLM_BASE_URL ?? '',
-          apiKey: env.LITELLM_API_KEY ?? '',
-        },
-        models: { [modelID]: {} },
-      },
-    },
   });
 }
 
 /**
- * Starts a sandbox container for a session via `docker run -d`.
+ * Starts a sandbox container for a session via `docker run -d`, bind-mounting the three
+ * `bootstrapWorkspace()`-produced host directories (target repo, platform config, optional team
+ * config) instead of a single static workspace path — every session gets its own, per-session
+ * clone, never a directory shared across sessions.
  * @param {SandboxSession} session - Session to spawn a sandbox for.
  * @param {NodeJS.ProcessEnv} [env] - Environment source, defaults to `process.env`.
  * @returns {Promise<{containerName: string, containerId: string}>} The started container's name/id.
- * @throws {Error} With trimmed `docker` stderr if the spawn fails, or if required env is missing.
+ * @throws {Error} With trimmed `docker` stderr if the spawn fails, or if required env/session
+ *   fields are missing.
  */
 export async function run(session, env = process.env) {
   const name = containerName(session.id);
   const image = env.SANDBOX_IMAGE;
-  const hostRepoPath = env.WORKSPACE_HOST_PATH;
   if (!image) throw new Error('SANDBOX_IMAGE is not set');
-  if (!hostRepoPath) throw new Error('WORKSPACE_HOST_PATH is not set');
+  if (!session.targetDir) throw new Error('session.targetDir is required');
+  if (!session.platformConfigDir) {
+    throw new Error('session.platformConfigDir is required');
+  }
 
   const args = [
     'run',
@@ -109,23 +120,36 @@ export async function run(session, env = process.env) {
     // name is project-prefixed by compose, so it's resolved from env, never hardcoded here.
     '--network',
     env.SANDBOX_NETWORK ?? 'egress-net',
-    // The control plane itself runs in a container, so this must be a HOST path, not a path
-    // inside the control-plane container — threaded through WORKSPACE_HOST_PATH.
+    // The control plane itself runs in a container, so these must be HOST paths, not paths
+    // inside the control-plane container — `bootstrapWorkspace()`'s directories are cloned onto
+    // a bind mount shared identically between the control-plane container and the host.
     '-v',
-    `${hostRepoPath}:/workspace/repo:ro`,
+    `${session.targetDir}:/workspace/repo:ro`,
+    '-v',
+    `${session.platformConfigDir}:${GLOBAL_CONFIG_CONTAINER_PATH}`,
+  ];
+  if (session.teamConfigDir) {
+    args.push('-v', `${session.teamConfigDir}:${TEAM_CONFIG_CONTAINER_PATH}`);
+  }
+  args.push(
     '-e',
     `SESSION_ID=${session.id}`,
     '-e',
     `CONTROL_PLANE_URL=${env.CONTROL_PLANE_URL ?? ''}`,
+  );
+  if (session.teamConfigDir) {
+    args.push('-e', `OPENCODE_CONFIG_DIR=${TEAM_CONFIG_CONTAINER_PATH}`);
+  }
+  args.push(
     '-e',
-    `OPENCODE_CONFIG_CONTENT=${buildOpencodeConfig(session, env)}`,
+    `OPENCODE_CONFIG_CONTENT=${buildOpencodeConfig(session)}`,
     // PHASE-4: injected by the Caddy sandbox-proxy instead of a raw env var.
     '-e',
     `LITELLM_BASE_URL=${env.LITELLM_BASE_URL ?? ''}`,
     '-e',
     `LITELLM_API_KEY=${env.LITELLM_API_KEY ?? ''}`,
     image,
-  ];
+  );
 
   const containerId = await runDocker(args);
   return { containerName: name, containerId };
@@ -204,4 +228,33 @@ export async function waitForHealth(
     }
     await sleep(intervalMs);
   }
+}
+
+/**
+ * Stops a session's sandbox: a direct, bounded-timeout proxy call to the bridge's `POST /stop`
+ * (which calls OpenCode's native `abort`, ARCHITECTURE.md §9), falling back to `docker stop` only
+ * if the bridge doesn't respond in time — never on any other bridge error shape, so a genuinely
+ * broken bridge doesn't mask itself as a clean stop.
+ * @param {string} name - Container name.
+ * @param {{fetchImpl?: typeof fetch, timeoutMs?: number}} [options] - Injectable fetch (tests) and
+ *   the bridge-response timeout before falling back to `docker stop`.
+ * @returns {Promise<{method: 'bridge'|'docker'}>} Which path actually stopped the sandbox.
+ * @throws {Error} With trimmed `docker stop` stderr if both the bridge and the fallback fail.
+ */
+export async function stop(name, { fetchImpl = fetch, timeoutMs = 5000 } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetchImpl(`http://${name}:${DEFAULT_BRIDGE_PORT}/stop`, {
+      method: 'POST',
+      signal: controller.signal,
+    });
+    if (res.ok) return { method: 'bridge' };
+  } catch {
+    // Bridge unreachable or the bounded timeout fired — fall back to `docker stop` below.
+  } finally {
+    clearTimeout(timer);
+  }
+  await runDocker(['stop', name]);
+  return { method: 'docker' };
 }

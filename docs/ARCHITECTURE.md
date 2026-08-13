@@ -339,6 +339,11 @@ layer uses `OPENCODE_CONFIG_DIR` (step 5), and the target repo's own `opencode.j
 discovered natively by opencode after cloning. **No custom *merge-algorithm* logic is required** —
 opencode resolves layer precedence natively.
 
+**Validation gate:** any change to this precedence chain, its composition code, or the env vars that
+feed it must be verified end-to-end in the *same* implementation step, not deferred to a later phase
+gate — see root `AGENTS.md`'s "Validation Conventions" section for the required rule and the
+regression (`docs/phase_02_findings.md`) it was written to prevent.
+
 **Precision correction:** this is *not* "purely opencode's native resolution end-to-end" — the
 bootstrap/supervisor layer (below) explicitly **composes** which directory trees exist at which paths
 (via cloning/mounting) and **overwrites the model selection at runtime** via `OPENCODE_CONFIG_CONTENT`

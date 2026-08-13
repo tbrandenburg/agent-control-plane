@@ -1,0 +1,36 @@
+
+> agent-control-plane@0.0.1 e2e /home/tom/workspace/ai/made/workspace/agent-control-plane
+> pnpm --filter e2e exec playwright test
+
+
+Running 19 tests using 1 worker
+
+(node:2772141) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+cat: /workspace/repo/README.md: No such file or directory
+  ✓   1 tests/arbitrary-repo-bootstrap.spec.ts:89:7 › arbitrary-repo bootstrap wiring (real docker compose stack, two distinct real repos) › two sessions against two distinct repos end up with distinct, correct /workspace/repo content (33.3s)
+  ✓   2 tests/bootstrap-failures.spec.ts:43:7 › bootstrap failure classification (real git, real network) › not_found: a real nonexistent/unauthenticated GitHub repo (621ms)
+  ✓   3 tests/bootstrap-failures.spec.ts:55:7 › bootstrap failure classification (real git, real network) › network: a real non-routable host times out unreachable (52ms)
+  ✓   4 tests/bootstrap-failures.spec.ts:67:7 › bootstrap failure classification (real git, real network) › auth: a real repo hit with a bad embedded credential (587ms)
+  ✓   5 tests/bootstrap-failures.spec.ts:83:7 › bootstrap failure classification (real git, real network) › unknown: a synthetic stderr string matching none of the known patterns (fail-closed default, not a real clone) (5ms)
+warning: You appear to have cloned an empty repository.
+warning: You appear to have cloned an empty repository.
+
+  ✓   6 tests/bootstrap-platform-config.spec.ts:20:7 › platform-config-repo fixture (real git, no docker stack required) › bootstrapWorkspace() clones a real, distinct platform-config fixture and its marker lands verbatim (869ms)
+(node:2772209) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   7 tests/session-lifecycle.spec.ts:167:7 › session lifecycle (real docker compose stack) › create (202) → pending_bootstrap → active → prompt over WS → streaming transcript over the socket → opencode_session_id persisted (19.5s)
+  ✓   8 tests/session-lifecycle.spec.ts:227:7 › session lifecycle (real docker compose stack) › variant: two concurrent WS subscribers to the same session both receive the same broadcast event (19.2s)
+  ✓   9 tests/session-lifecycle.spec.ts:260:7 › session lifecycle (real docker compose stack) › error path: WS subscribe with a wrong wsToken closes with code 4001, and a prompt sent before subscribing is rejected (153ms)
+  ✓  10 tests/session-lifecycle.spec.ts:281:7 › session lifecycle (real docker compose stack) › error path: prompting a session stuck in pending_bootstrap (no live container yet) returns 503, and a nonexistent session returns 404 (44ms)
+  ✓  11 tests/session-lifecycle.spec.ts:291:7 › session lifecycle (real docker compose stack) › PATCH /api/sessions/:id archives a session, reflected on GET (99ms)
+  ✓  12 tests/smoke.spec.ts:5:7 › smoke › dashboard shell renders at / (800ms)
+  ✓  13 tests/smoke.spec.ts:10:7 › smoke › GET /health returns 200 ok (16ms)
+  ✓  14 tests/smoke.spec.ts:16:7 › smoke › /sessions/new serves the SPA rather than 404 (395ms)
+  ✓  15 tests/smoke.spec.ts:30:9 › smoke › /sessions serves the SPA shell rather than a raw JSON 404 (560ms)
+  ✓  16 tests/smoke.spec.ts:30:9 › smoke › /sessions/ serves the SPA shell rather than a raw JSON 404 (474ms)
+  ✓  17 tests/smoke.spec.ts:30:9 › smoke › /nonexistent-route serves the SPA shell rather than a raw JSON 404 (545ms)
+  ✓  18 tests/smoke.spec.ts:30:9 › smoke › /sessions/new/extra serves the SPA shell rather than a raw JSON 404 (463ms)
+  ✓  19 tests/smoke.spec.ts:40:7 › smoke › unmatched /api route still returns a JSON 404, not the SPA shell (15ms)
+
+  19 passed (1.3m)

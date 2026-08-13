@@ -1,19 +1,56 @@
 /**
- * Session detail — `/sessions/:id` (UI.md §3). Overview panel + transcript + prompt composer,
- * scoped to what Phase 1's backend actually provides (no Participants/Artifacts/Diagnostics/Logs
- * yet — those endpoints don't exist this phase, UI.md's design goal of never rendering an unbacked
- * panel).
+ * Session detail — `/sessions/:id` (UI.md §3). Overview panel + WS-driven transcript + prompt
+ * composer + Stop/Archive header buttons, scoped to what this phase's backend actually provides
+ * (no Participants/Artifacts/Diagnostics/Logs yet — those endpoints don't exist this phase,
+ * UI.md's design goal of never rendering an unbacked panel).
  */
-import { useModels, useSendPrompt, useSession } from '@/api/client';
+import {
+  getStoredWsToken,
+  useArchiveSession,
+  useModels,
+  useSendPrompt,
+  useSession,
+  useStopSession,
+} from '@/api/client';
 import { PromptComposer } from '@/components/PromptComposer';
 import { type DockerPhase, StatusBadge } from '@/components/StatusBadge';
 import { Transcript } from '@/components/Transcript';
+import { Button } from '@/components/ui/button';
+import { type SocketStatus, useSessionSocket } from '@/hooks/useSessionSocket';
 import { Link } from '@/lib/router';
+
+const CONNECTION_LABEL: Record<
+  SocketStatus,
+  { label: string; className: string }
+> = {
+  open: { label: 'Connected', className: 'text-green-600' },
+  reconnecting: { label: 'Reconnecting…', className: 'text-amber-600' },
+  connecting: { label: 'Connecting…', className: 'text-amber-600' },
+  closed: { label: 'Disconnected', className: 'text-muted-foreground' },
+};
+
+/** WS connection indicator driven by {@link useSessionSocket}'s live `status`. */
+function ConnectionIndicator({ status }: { status: SocketStatus }) {
+  const { label, className } = CONNECTION_LABEL[status];
+  return (
+    <span
+      role="status"
+      className={`inline-flex items-center gap-1.5 text-sm ${className}`}
+    >
+      <span aria-hidden="true">●</span>
+      {label}
+    </span>
+  );
+}
 
 export function SessionDetail({ id }: { id: string }) {
   const { data: session, isLoading, isError, error } = useSession(id);
   const { data: modelsData } = useModels();
   const sendPrompt = useSendPrompt(id);
+  const stopSession = useStopSession(id);
+  const archiveSession = useArchiveSession(id);
+  const wsToken = getStoredWsToken(id);
+  const { events, status, invalidToken } = useSessionSocket(id, wsToken);
 
   if (isLoading)
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -36,6 +73,8 @@ export function SessionDetail({ id }: { id: string }) {
     );
   }
 
+  const archived = session.status === 'archived';
+
   return (
     <div>
       <Link to="/" className="text-sm text-muted-foreground hover:underline">
@@ -49,16 +88,49 @@ export function SessionDetail({ id }: { id: string }) {
             {session.reasoningEffort}
           </p>
         </div>
-        <StatusBadge
-          sessionStatus={session.status}
-          dockerPhase={session.phase as DockerPhase}
-        />
+        <div className="flex items-center gap-3">
+          <StatusBadge
+            sessionStatus={session.status}
+            dockerPhase={session.phase as DockerPhase}
+          />
+          <ConnectionIndicator status={status} />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={archived || stopSession.isPending}
+            onClick={() => stopSession.mutate()}
+          >
+            Stop
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={archived || archiveSession.isPending}
+            onClick={() => archiveSession.mutate()}
+          >
+            Archive
+          </Button>
+        </div>
       </div>
+      {stopSession.isError && (
+        <p role="alert" className="text-sm text-red-600">
+          {stopSession.error.message}
+        </p>
+      )}
+      {archiveSession.isError && (
+        <p role="alert" className="text-sm text-red-600">
+          {archiveSession.error.message}
+        </p>
+      )}
 
       <div className="mt-4 grid grid-cols-3 gap-4">
         <div className="col-span-2 rounded-md border">
           <div className="max-h-[60vh] overflow-y-auto p-4">
-            <Transcript sessionId={id} />
+            <Transcript
+              events={events}
+              status={status}
+              invalidToken={invalidToken}
+            />
           </div>
           {sendPrompt.isError && (
             <p role="alert" className="px-4 text-sm text-red-600">

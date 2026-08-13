@@ -1,0 +1,83 @@
+
+> agent-control-plane@0.0.1 typecheck:all /home/tom/workspace/ai/made/workspace/agent-control-plane
+> pnpm -r run typecheck
+
+Scope: 4 of 5 workspace projects
+control-plane typecheck$ tsc --noEmit -p ../tsconfig.json
+control-plane/dashboard typecheck$ tsc --noEmit -p tsconfig.json
+control-plane/dashboard typecheck: Done
+control-plane typecheck: src/bootstrap.js(38,13): error TS2339: Property 'stderr' does not exist on type 'Error'.
+control-plane typecheck: src/bootstrap.js(88,5): error TS18046: 'err' is of type 'unknown'.
+control-plane typecheck: src/bootstrap.js(88,45): error TS18046: 'err' is of type 'unknown'.
+control-plane typecheck: src/bootstrap.js(94,11): error TS2339: Property 'classification' does not exist on type 'Error'.
+control-plane typecheck: src/bootstrap.js(128,5): error TS18046: 'err' is of type 'unknown'.
+control-plane typecheck: src/bootstrap.js(128,26): error TS18046: 'err' is of type 'unknown'.
+control-plane typecheck: src/bootstrap.js(128,67): error TS18046: 'err' is of type 'unknown'.
+control-plane typecheck: src/bootstrap.js(215,23): error TS18046: 'err' is of type 'unknown'.
+control-plane typecheck: src/bootstrap.js(219,47): error TS18046: 'err' is of type 'unknown'.
+control-plane typecheck: src/bootstrap.js(221,13): error TS2339: Property 'role' does not exist on type 'Error'.
+control-plane typecheck: src/bootstrap.js(222,13): error TS2339: Property 'classification' does not exist on type 'Error'.
+control-plane typecheck: src/bootstrap.js(222,30): error TS18046: 'err' is of type 'unknown'.
+control-plane typecheck: src/bootstrap.js(225,28): error TS2322: Type 'string' is not assignable to type 'null'.
+control-plane typecheck: src/bootstrap.js(226,30): error TS2322: Type 'string' is not assignable to type 'null'.
+control-plane typecheck: src/bootstrap.js(227,26): error TS2322: Type 'string' is not assignable to type 'null'.
+control-plane typecheck: src/bootstrap.js(230,3): error TS2322: Type '{ targetDir: null; platformConfigDir: null; teamConfigDir: null; }' is not assignable to type '{ targetDir: string; platformConfigDir: string; teamConfigDir: string | null; }'.
+control-plane typecheck:   Types of property 'targetDir' are incompatible.
+control-plane typecheck:     Type 'null' is not assignable to type 'string'.
+control-plane typecheck: src/bootstrap.test.js(23,5): error TS7034: Variable 'bareRepoPath' implicitly has type 'any' in some locations where its type cannot be determined.
+control-plane typecheck: src/bootstrap.test.js(24,5): error TS7034: Variable 'sha' implicitly has type 'any' in some locations where its type cannot be determined.
+control-plane typecheck: src/bootstrap.test.js(25,7): error TS7034: Variable 'workDirs' implicitly has type 'any[]' in some locations where its type cannot be determined.
+control-plane typecheck: src/bootstrap.test.js(49,21): error TS7005: Variable 'workDirs' implicitly has an 'any[]' type.
+control-plane typecheck: src/bootstrap.test.js(116,39): error TS7005: Variable 'bareRepoPath' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(117,27): error TS7005: Variable 'sha' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(137,18): error TS7005: Variable 'bareRepoPath' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(147,28): error TS7005: Variable 'bareRepoPath' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(147,42): error TS7005: Variable 'sha' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(151,23): error TS7005: Variable 'sha' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(200,28): error TS7005: Variable 'bareRepoPath' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(200,42): error TS7005: Variable 'sha' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(221,28): error TS7005: Variable 'bareRepoPath' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(221,42): error TS7005: Variable 'sha' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(228,22): error TS7005: Variable 'bareRepoPath' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(244,28): error TS7005: Variable 'bareRepoPath' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(245,36): error TS7005: Variable 'bareRepoPath' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(265,38): error TS7005: Variable 'bareRepoPath' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(278,30): error TS7005: Variable 'bareRepoPath' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(291,28): error TS7005: Variable 'bareRepoPath' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(292,36): error TS7005: Variable 'bareRepoPath' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(312,30): error TS7005: Variable 'bareRepoPath' implicitly has an 'any' type.
+control-plane typecheck: src/bootstrap.test.js(313,38): error TS7005: Variable 'bareRepoPath' implicitly has an 'any' type.
+control-plane typecheck: src/prompt-session.js(61,38): error TS2322: Type 'unknown' is not assignable to type 'object'.
+control-plane typecheck: src/routes/internal.js(32,45): error TS2698: Spread types may only be created from object types.
+control-plane typecheck: src/routes/sessions.test.js(328,9): error TS2322: Type '(value: PromiseLike<{ containerName: string; containerId: string; }> | { containerName: string; containerId: string; }) => void' is not assignable to type '(value?: unknown) => void'.
+control-plane typecheck:   Types of parameters 'value' and 'value' are incompatible.
+control-plane typecheck:     Type 'unknown' is not assignable to type 'PromiseLike<{ containerName: string; containerId: string; }> | { containerName: string; containerId: string; }'.
+control-plane typecheck: src/routes/sessions.test.js(362,5): error TS2454: Variable 'resolveRun' is used before being assigned.
+control-plane typecheck: src/routes/sessions.test.js(548,20): error TS2339: Property 'role' does not exist on type 'Error'.
+control-plane typecheck: src/routes/sessions.test.js(549,20): error TS2339: Property 'classification' does not exist on type 'Error'.
+control-plane typecheck: src/routes/ws.js(12,34): error TS7016: Could not find a declaration file for module 'ws'. '/home/tom/workspace/ai/made/node_modules/ws/wrapper.mjs' implicitly has an 'any' type.
+control-plane typecheck:   Try `npm i --save-dev @types/ws` if it exists or add a new declaration (.d.ts) file containing `declare module 'ws';`
+control-plane typecheck: src/routes/ws.js(36,19): error TS7016: Could not find a declaration file for module 'ws'. '/home/tom/workspace/ai/made/node_modules/ws/wrapper.mjs' implicitly has an 'any' type.
+control-plane typecheck:   Try `npm i --save-dev @types/ws` if it exists or add a new declaration (.d.ts) file containing `declare module 'ws';`
+control-plane typecheck: src/routes/ws.js(52,19): error TS7016: Could not find a declaration file for module 'ws'. '/home/tom/workspace/ai/made/node_modules/ws/wrapper.mjs' implicitly has an 'any' type.
+control-plane typecheck:   Try `npm i --save-dev @types/ws` if it exists or add a new declaration (.d.ts) file containing `declare module 'ws';`
+control-plane typecheck: src/routes/ws.js(84,27): error TS7006: Parameter 'raw' implicitly has an 'any' type.
+control-plane typecheck: src/routes/ws.test.js(109,33): error TS18047: 'address' is possibly 'null'.
+control-plane typecheck: src/routes/ws.test.js(109,41): error TS2339: Property 'port' does not exist on type 'string | AddressInfo'.
+control-plane typecheck:   Property 'port' does not exist on type 'string'.
+control-plane typecheck: src/routes/ws.test.js(121,32): error TS2339: Property 'db' does not exist on type 'FastifyInstance<RawServerDefault, IncomingMessage, ServerResponse<IncomingMessage>, FastifyBaseLogger, FastifyTypeProviderDefault>'.
+control-plane typecheck: src/routes/ws.test.js(138,32): error TS2339: Property 'db' does not exist on type 'FastifyInstance<RawServerDefault, IncomingMessage, ServerResponse<IncomingMessage>, FastifyBaseLogger, FastifyTypeProviderDefault>'.
+control-plane typecheck: src/routes/ws.test.js(147,32): error TS2339: Property 'db' does not exist on type 'FastifyInstance<RawServerDefault, IncomingMessage, ServerResponse<IncomingMessage>, FastifyBaseLogger, FastifyTypeProviderDefault>'.
+control-plane typecheck: src/routes/ws.test.js(156,32): error TS2339: Property 'db' does not exist on type 'FastifyInstance<RawServerDefault, IncomingMessage, ServerResponse<IncomingMessage>, FastifyBaseLogger, FastifyTypeProviderDefault>'.
+control-plane typecheck: src/routes/ws.test.js(178,32): error TS2339: Property 'db' does not exist on type 'FastifyInstance<RawServerDefault, IncomingMessage, ServerResponse<IncomingMessage>, FastifyBaseLogger, FastifyTypeProviderDefault>'.
+control-plane typecheck: src/routes/ws.test.js(187,32): error TS2339: Property 'db' does not exist on type 'FastifyInstance<RawServerDefault, IncomingMessage, ServerResponse<IncomingMessage>, FastifyBaseLogger, FastifyTypeProviderDefault>'.
+control-plane typecheck: src/routes/ws.test.js(202,32): error TS2339: Property 'db' does not exist on type 'FastifyInstance<RawServerDefault, IncomingMessage, ServerResponse<IncomingMessage>, FastifyBaseLogger, FastifyTypeProviderDefault>'.
+control-plane typecheck: src/sandbox.test.js(173,19): error TS2532: Object is possibly 'undefined'.
+control-plane typecheck: src/sandbox.test.js(205,19): error TS2532: Object is possibly 'undefined'.
+control-plane typecheck: src/sandbox.test.js(251,9): error TS2741: Property 'targetDir' is missing in type '{ id: string; model: string; platformConfigDir: string; }' but required in type 'SandboxSession'.
+control-plane typecheck: src/sandbox.test.js(261,9): error TS2741: Property 'platformConfigDir' is missing in type '{ id: string; model: string; targetDir: string; }' but required in type 'SandboxSession'.
+control-plane typecheck: Failed
+/home/tom/workspace/ai/made/workspace/agent-control-plane/control-plane:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  control-plane@0.0.1 typecheck: `tsc --noEmit -p ../tsconfig.json`
+Exit status 1
+ ELIFECYCLE  Command failed with exit code 1.

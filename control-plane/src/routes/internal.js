@@ -5,6 +5,8 @@
  * No auth in this phase. PHASE-4: check a per-session `INTERNAL_TOKEN` here, minted at spawn time.
  */
 
+import { broadcastToSession } from './ws.js';
+
 /**
  * Registers `/internal/sessions/:id/events` and `/internal/sessions/:id/oc-session` on the given
  * Fastify instance.
@@ -26,6 +28,8 @@ export function registerInternalRoutes(app, db) {
     db.prepare(
       'INSERT INTO events (session_id, timestamp, payload) VALUES (?, ?, ?)',
     ).run(id, new Date().toISOString(), JSON.stringify(req.body ?? {}));
+
+    broadcastToSession(id, { type: 'event', ...req.body });
 
     reply.code(201);
     return { status: 'stored' };

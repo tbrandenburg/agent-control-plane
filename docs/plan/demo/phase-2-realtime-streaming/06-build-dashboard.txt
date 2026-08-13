@@ -1,0 +1,17 @@
+
+> agent-control-plane@0.0.1 build:dashboard /home/tom/workspace/ai/made/workspace/agent-control-plane
+> pnpm --filter dashboard run build
+
+
+> dashboard@0.0.1 build /home/tom/workspace/ai/made/workspace/agent-control-plane/control-plane/dashboard
+> vite build --outDir ../public --emptyOutDir
+
+vite v8.2.1 building client environment for production...
+[2Ktransforming...✓ 79 modules transformed.
+rendering chunks...
+computing gzip size...
+../public/index.html                   0.40 kB │ gzip:  0.27 kB
+../public/assets/index-CSpPbkt7.css   13.42 kB │ gzip:  3.59 kB
+../public/assets/index-BoRPjzCm.js   274.62 kB │ gzip: 84.95 kB
+
+✓ built in 593ms

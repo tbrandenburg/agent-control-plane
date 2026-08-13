@@ -9,6 +9,13 @@ services:
     volumes:
       - ./data:/data
       - /var/run/docker.sock:/var/run/docker.sock
+      # Bootstrap (control-plane/src/bootstrap.js) clones per-session repo trees from *inside*
+      # this container via plain node:fs/child_process — but `sandbox.js`'s `docker run -v` calls
+      # go to the HOST docker daemon (via the socket above), so a clone path only visible inside
+      # this container could never be bind-mounted into a spawned sandbox. Mounting the same
+      # absolute host path at the identical path in both places keeps every path bootstrap
+      # produces valid as a `docker run -v` source without any container/host path translation.
+      - ${WORKSPACE_HOST_PATH:-${PWD}/workspace}:${WORKSPACE_HOST_PATH:-${PWD}/workspace}
     networks:
       - egress-net
     environment:
@@ -19,14 +26,14 @@ services:
       SANDBOX_NETWORK: egress-net
       WORKSPACE_HOST_PATH: ${WORKSPACE_HOST_PATH:-${PWD}/workspace}
       CONTROL_PLANE_URL: http://control-plane:3000
-      # PHASE-4: injected by the Caddy sandbox-proxy instead of a raw env var passed to sandboxes.
-      # Defaults point at `stub-model` below (e2e/fixtures/stub-model-server.mjs) so `make e2e`
-      # is free/deterministic and needs no external credentials — override both to route at a
-      # real LiteLLM deployment instead (docs/phase_01_findings.md).
-      LITELLM_BASE_URL: ${LITELLM_BASE_URL:-http://stub-model:4141/v1}
-      LITELLM_API_KEY: ${LITELLM_API_KEY:-stub-key}
-    depends_on:
-      - stub-model
+      # PHASE-2 (step 00602): no default LITELLM_BASE_URL/LITELLM_API_KEY are injected here.
+      # `OPENCODE_CONFIG_CONTENT` (control-plane/src/sandbox.js) composes only {model, autoupdate}
+      # (ARCHITECTURE.md §8 Option C) — model resolution for any `litellm/*` model id requires a
+      # real Platform config repo's own provider block (step 00601), not a control-plane default.
+      # `make e2e` instead defaults to `opencode/big-pickle`, a real, free, zero-credential model
+      # bundled natively with opencode (e2e/tests/session-lifecycle.spec.ts) — see
+      # docs/phase_01_findings.md's dated addendum for why the old `stub-model` fixture no longer
+      # applies standalone.
 
   # Never started by `docker compose up` — sandboxes are spawned dynamically per session via
   # `docker run` (control-plane/src/sandbox.js), not as a long-running compose service. This
@@ -37,19 +44,6 @@ services:
       context: .
       dockerfile: sandbox/Dockerfile
     profiles: ["build-only"]
-
-  # E2E-only stand-in for a real model provider — see e2e/fixtures/stub-model-server.mjs's own
-  # header comment for why this isn't a violation of the "no mocks in E2E" rule (it substitutes
-  # only the third-party model backend, never Docker/opencode/the bridge/the SSE relay).
-  stub-model:
-    image: node:24-slim
-    command: ["node", "/fixtures/stub-model-server.mjs"]
-    volumes:
-      - ./e2e/fixtures:/fixtures:ro
-    environment:
-      PORT: "4141"
-    networks:
-      - egress-net
 
 networks:
   egress-net:

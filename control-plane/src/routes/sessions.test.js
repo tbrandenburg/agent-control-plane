@@ -8,24 +8,55 @@ import { decodeCursor, encodeCursor } from './sessions.js';
 vi.mock('../sandbox.js', () => ({
   run: vi.fn(),
   waitForHealth: vi.fn(),
+  stop: vi.fn(),
+}));
+
+vi.mock('../bootstrap.js', () => ({
+  bootstrapWorkspace: vi.fn(),
 }));
 
 const sandbox = await import('../sandbox.js');
+const bootstrap = await import('../bootstrap.js');
 
 /** @type {string} */
 let dataDir;
 /** @type {string|undefined} */
 let previousDataDir;
+/** @type {string} */
+let workspaceHostPath;
+/** @type {string|undefined} */
+let previousWorkspaceHostPath;
+
+/** Waits for `setImmediate`-scheduled work (this step's async spawn split) to have run. */
+function flushAsyncSpawn() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
 
 beforeEach(() => {
   dataDir = mkdtempSync(join(tmpdir(), 'cp-sessions-test-'));
   previousDataDir = process.env.DATA_DIR;
   process.env.DATA_DIR = dataDir;
+  workspaceHostPath = mkdtempSync(join(tmpdir(), 'cp-sessions-workspace-'));
+  previousWorkspaceHostPath = process.env.WORKSPACE_HOST_PATH;
+  process.env.WORKSPACE_HOST_PATH = workspaceHostPath;
   vi.mocked(sandbox.run).mockReset();
   vi.mocked(sandbox.waitForHealth).mockReset();
+  vi.mocked(sandbox.stop).mockReset();
+  vi.mocked(bootstrap.bootstrapWorkspace).mockReset();
+  vi.mocked(bootstrap.bootstrapWorkspace).mockResolvedValue({
+    targetDir: '/workspace/target',
+    platformConfigDir: '/workspace/platform',
+    teamConfigDir: null,
+  });
 });
 
 afterEach(async () => {
+  if (previousWorkspaceHostPath === undefined) {
+    delete process.env.WORKSPACE_HOST_PATH;
+  } else {
+    process.env.WORKSPACE_HOST_PATH = previousWorkspaceHostPath;
+  }
+  rmSync(workspaceHostPath, { recursive: true, force: true });
   if (previousDataDir === undefined) delete process.env.DATA_DIR;
   else process.env.DATA_DIR = previousDataDir;
   rmSync(dataDir, { recursive: true, force: true });
@@ -289,7 +320,51 @@ describe('cursor encode/decode', () => {
 });
 
 describe('POST /api/sessions', () => {
-  it('creates a session, spawns the sandbox, and returns 201 { id }', async () => {
+  it('returns 202 immediately with { id, wsToken }, before bootstrap completes', async () => {
+    /** @type {(value?: unknown) => void} */
+    let resolveRun;
+    vi.mocked(sandbox.run).mockReturnValue(
+      new Promise((resolve) => {
+        resolveRun = resolve;
+      }),
+    );
+    const app = buildServer();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/sessions',
+      payload: {
+        title: 'My session',
+        repoOwner: 'acme',
+        repoName: 'widgets',
+        model: 'litellm/claude-sonnet',
+      },
+    });
+
+    // The 202 already arrived even though `sandbox.run` has not resolved yet — proves the
+    // response is decoupled from the (deliberately unresolved) bootstrap stub.
+    expect(response.statusCode).toBe(202);
+    const body = response.json();
+    expect(typeof body.id).toBe('string');
+    expect(typeof body.wsToken).toBe('string');
+
+    const row = getDb(app)
+      .prepare('SELECT * FROM sessions WHERE id = ?')
+      .get(body.id);
+    expect(row?.status).toBe('pending_bootstrap');
+    expect(row?.container_name).toBeNull();
+
+    vi.mocked(sandbox.waitForHealth).mockResolvedValue({
+      exists: true,
+      state: 'running',
+    });
+    resolveRun({ containerName: 'sandbox-x', containerId: 'abc123' });
+    await flushAsyncSpawn();
+    await app.close();
+  });
+
+  it('transitions to active with the container name once bootstrap/spawn succeeds', async () => {
     vi.mocked(sandbox.run).mockResolvedValue({
       containerName: 'sandbox-x',
       containerId: 'abc123',
@@ -312,9 +387,10 @@ describe('POST /api/sessions', () => {
       },
     });
 
-    expect(response.statusCode).toBe(201);
+    expect(response.statusCode).toBe(202);
     const body = response.json();
-    expect(typeof body.id).toBe('string');
+    await flushAsyncSpawn();
+
     expect(sandbox.run).toHaveBeenCalledWith(
       expect.objectContaining({ id: body.id, model: 'litellm/claude-sonnet' }),
     );
@@ -351,7 +427,8 @@ describe('POST /api/sessions', () => {
       },
     });
 
-    expect(response.statusCode).toBe(201);
+    expect(response.statusCode).toBe(202);
+    await flushAsyncSpawn();
     await app.close();
   });
 
@@ -439,7 +516,7 @@ describe('POST /api/sessions', () => {
     await app.close();
   });
 
-  it('returns 500 with a readable message on spawn failure, leaving the row queryable', async () => {
+  it('leaves the row queryable in a failed status on spawn failure', async () => {
     vi.mocked(sandbox.run).mockRejectedValue(new Error('docker: bad image'));
     const app = buildServer();
     await app.ready();
@@ -455,12 +532,223 @@ describe('POST /api/sessions', () => {
       },
     });
 
-    expect(response.statusCode).toBe(500);
-    expect(response.json()).toEqual({ error: 'docker: bad image' });
+    expect(response.statusCode).toBe(202);
+    await flushAsyncSpawn();
 
     const rows = getDb(app).prepare('SELECT * FROM sessions').all();
     expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe('active');
+    expect(rows[0].status).toBe('pending_bootstrap-failed');
+    await app.close();
+  });
+
+  it('leaves the row queryable in a failed status when bootstrapWorkspace() itself fails, never calling sandbox.run()', async () => {
+    const bootstrapError = new Error(
+      'bootstrap failed for target repo: repository not found',
+    );
+    bootstrapError.role = 'target';
+    bootstrapError.classification = 'not_found';
+    vi.mocked(bootstrap.bootstrapWorkspace).mockRejectedValue(bootstrapError);
+    const app = buildServer();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/sessions',
+      payload: {
+        title: 'My session',
+        repoOwner: 'this-org-should-not-exist-zzz',
+        repoName: 'nope',
+        model: 'litellm/claude-sonnet',
+      },
+    });
+
+    expect(response.statusCode).toBe(202);
+    await flushAsyncSpawn();
+
+    expect(sandbox.run).not.toHaveBeenCalled();
+    const rows = getDb(app).prepare('SELECT * FROM sessions').all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('pending_bootstrap-failed');
+    await app.close();
+  });
+
+  it('resolves the target repo URL from repoOwner/repoName and passes the optional teamConfigRepo through to bootstrapWorkspace()', async () => {
+    vi.mocked(sandbox.run).mockResolvedValue({
+      containerName: 'sandbox-x',
+      containerId: 'abc123',
+    });
+    vi.mocked(sandbox.waitForHealth).mockResolvedValue({
+      exists: true,
+      state: 'running',
+    });
+    const app = buildServer();
+    await app.ready();
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/sessions',
+      payload: {
+        title: 'My session',
+        repoOwner: 'acme',
+        repoName: 'widgets',
+        model: 'litellm/claude-sonnet',
+        teamConfigRepo: 'acme/team-config',
+      },
+    });
+    await flushAsyncSpawn();
+
+    expect(bootstrap.bootstrapWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetRepo: { url: 'https://github.com/acme/widgets.git', ref: 'HEAD' },
+        teamConfigRepo: {
+          url: 'https://github.com/acme/team-config.git',
+          ref: 'HEAD',
+        },
+      }),
+      expect.stringContaining(workspaceHostPath),
+    );
+    expect(sandbox.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetDir: '/workspace/target',
+        platformConfigDir: '/workspace/platform',
+      }),
+    );
+    await app.close();
+  });
+});
+
+describe('POST /api/sessions/:id/stop', () => {
+  it('returns 404 for an unknown session', async () => {
+    const app = buildServer();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/sessions/does-not-exist/stop',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(sandbox.stop).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('returns 409 with no attempted stop when no sandbox has been spawned yet', async () => {
+    const app = buildServer();
+    seedSession(getDb(app), { id: 'sess-1', container_name: null });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/sessions/sess-1/stop',
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ error: 'NO_LIVE_CONTAINER' });
+    expect(sandbox.stop).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('proxies to sandbox.stop() and reports which path stopped it', async () => {
+    vi.mocked(sandbox.stop).mockResolvedValue({ method: 'bridge' });
+    const app = buildServer();
+    seedSession(getDb(app), { id: 'sess-1', container_name: 'sandbox-1' });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/sessions/sess-1/stop',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: 'stopped', method: 'bridge' });
+    expect(sandbox.stop).toHaveBeenCalledWith('sandbox-1');
+    await app.close();
+  });
+
+  it('returns 502 when both the bridge proxy and the docker stop fallback fail', async () => {
+    vi.mocked(sandbox.stop).mockRejectedValue(
+      new Error('docker: no such container'),
+    );
+    const app = buildServer();
+    seedSession(getDb(app), { id: 'sess-1', container_name: 'sandbox-1' });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/sessions/sess-1/stop',
+    });
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json()).toEqual({ error: 'docker: no such container' });
+    await app.close();
+  });
+});
+
+describe('PATCH /api/sessions/:id', () => {
+  it('returns 404 for an unknown session', async () => {
+    const app = buildServer();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/sessions/does-not-exist',
+      payload: { status: 'archived' },
+    });
+
+    expect(response.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it('returns 400 on an invalid status value', async () => {
+    const app = buildServer();
+    seedSession(getDb(app), { id: 'sess-1' });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/sessions/sess-1',
+      payload: { status: 'pending_bootstrap' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'INVALID_STATUS' });
+    await app.close();
+  });
+
+  it('transitions active -> archived', async () => {
+    const app = buildServer();
+    seedSession(getDb(app), { id: 'sess-1', status: 'active' });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/sessions/sess-1',
+      payload: { status: 'archived' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ id: 'sess-1', status: 'archived' });
+
+    const row = getDb(app)
+      .prepare('SELECT status FROM sessions WHERE id = ?')
+      .get('sess-1');
+    expect(row?.status).toBe('archived');
+    await app.close();
+  });
+
+  it('transitions archived -> active', async () => {
+    const app = buildServer();
+    seedSession(getDb(app), { id: 'sess-1', status: 'archived' });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/sessions/sess-1',
+      payload: { status: 'active' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ id: 'sess-1', status: 'active' });
     await app.close();
   });
 });

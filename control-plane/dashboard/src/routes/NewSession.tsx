@@ -1,11 +1,12 @@
 /**
  * Create session — `/sessions/new` (UI.md §2). Fields map 1:1 onto `POST /api/sessions`'s body:
- * `title`, `repoOwner`+`repoName`, `model` (from `GET /api/models`), `reasoningEffort`.
- * `teamConfigRepo`/`additionalRepos`/`readOrgRepos` are omitted entirely — Phase 1's declared
- * scope (docs/plan/plan.md's Excluded list), not just hidden.
+ * `title`, `repoOwner`+`repoName`, `model` (from `GET /api/models`), `reasoningEffort`,
+ * `teamConfigRepo` (optional — overrides the default team config repo, meaningful now that real
+ * bootstrap actually clones it, ARCHITECTURE.md §10). `additionalRepos`/`readOrgRepos` are still
+ * omitted entirely — a permanent declared deviation (ARCHITECTURE.md §13), not this phase's scope.
  */
 import { useState } from 'react';
-import { useCreateSession, useModels } from '@/api/client';
+import { storeWsToken, useCreateSession, useModels } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Link, useNavigate } from '@/lib/router';
 
@@ -20,6 +21,7 @@ export function NewSession() {
   const [repoOwner, setRepoOwner] = useState('');
   const [repoName, setRepoName] = useState('');
   const [model, setModel] = useState('');
+  const [teamConfigRepo, setTeamConfigRepo] = useState('');
   const [reasoningEffort, setReasoningEffort] =
     useState<(typeof REASONING_EFFORTS)[number]>('high');
 
@@ -35,7 +37,9 @@ export function NewSession() {
       repoName,
       model: selectedModel,
       reasoningEffort,
+      ...(teamConfigRepo ? { teamConfigRepo } : {}),
     });
+    storeWsToken(result.id, result.wsToken);
     navigate(`/sessions/${result.id}`);
   }
 
@@ -126,6 +130,22 @@ export function NewSession() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="teamConfigRepo" className="block text-sm font-medium">
+            Team config (optional)
+          </label>
+          <input
+            id="teamConfigRepo"
+            className="mt-1 w-full rounded-md border p-2 text-sm"
+            placeholder="owner/repository"
+            value={teamConfigRepo}
+            onChange={(e) => setTeamConfigRepo(e.target.value)}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Overrides the default team config repository
+          </p>
         </div>
 
         {createSession.isError && (

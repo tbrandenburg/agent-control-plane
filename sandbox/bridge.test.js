@@ -114,6 +114,16 @@ function createStubOc() {
         .end(JSON.stringify({ ok: true }));
       return;
     }
+    if (
+      req.method === 'POST' &&
+      req.url?.startsWith('/session/') &&
+      req.url.endsWith('/abort')
+    ) {
+      res
+        .writeHead(200, { 'content-type': 'application/json' })
+        .end(JSON.stringify({ aborted: true }));
+      return;
+    }
     res.writeHead(404).end();
   });
   return server;
@@ -234,5 +244,65 @@ describe('createBridge integration', () => {
     );
     const res = await fetch(`http://127.0.0.1:${address.port}/global/health`);
     assert.equal(res.status, 200);
+  });
+});
+
+describe('createBridge POST /stop', () => {
+  /** @type {import('node:http').Server} */
+  let ocServer;
+  /** @type {ReturnType<typeof createStubControlPlane>} */
+  let cp;
+  /** @type {ReturnType<typeof createBridge>} */
+  let bridge;
+  /** @type {number} */
+  let port;
+
+  before(async () => {
+    ocServer = createStubOc();
+    const ocPort = await listen(ocServer);
+    cp = createStubControlPlane();
+    const cpPort = await listen(cp.server);
+
+    bridge = createBridge({
+      ocUrl: `http://127.0.0.1:${ocPort}`,
+      controlPlaneUrl: `http://127.0.0.1:${cpPort}`,
+      sessionId: 'sess-1',
+    });
+    await bridge.start(0);
+    const address = /** @type {import('node:net').AddressInfo} */ (
+      bridge.server.address()
+    );
+    port = address.port;
+  });
+
+  after(async () => {
+    await bridge.stop();
+    await close(ocServer);
+    await close(cp.server);
+  });
+
+  it("proxies to opencode's POST /session/:id/abort", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/stop`, {
+      method: 'POST',
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.aborted, true);
+  });
+
+  it('still succeeds after a prompt has been sent on the same session', async () => {
+    const promptRes = await fetch(`http://127.0.0.1:${port}/prompt`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: 'hi', model: 'litellm/claude-sonnet' }),
+    });
+    assert.equal(promptRes.status, 200);
+
+    const stopRes = await fetch(`http://127.0.0.1:${port}/stop`, {
+      method: 'POST',
+    });
+    assert.equal(stopRes.status, 200);
+    const body = await stopRes.json();
+    assert.equal(body.aborted, true);
   });
 });

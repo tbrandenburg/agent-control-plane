@@ -1,12 +1,16 @@
 /**
- * Live transcript — polls `GET /api/sessions/:id/events` on a 1s TanStack Query interval via
- * {@link useSessionTranscript}, appending pages by the server's `timestamp,id` cursor (no
- * client-side re-sorting, ARCHITECTURE.md §4). Renders `message.part.delta` frames as
- * incremental text; every other frame renders as a compact type marker so nothing is silently
- * dropped from the verbatim-stored stream.
+ * Live transcript — WebSocket-driven via {@link useSessionSocket} (ARCHITECTURE.md §6),
+ * replacing Phase 1's 1s-poll {@code useSessionTranscript} outright (deletion, not layering, per
+ * this phase's plan). The **content** contract is unchanged from Phase 1: `message.part.delta`
+ * frames render as incremental text; every other frame renders as a compact type marker so
+ * nothing is silently dropped from the verbatim-stored stream.
+ *
+ * The socket itself is owned by `SessionDetail` (lifted so its header's connection indicator and
+ * this body share one live connection instead of opening two) and passed down as props.
  */
 import { useMemo } from 'react';
-import { type EventRecord, useSessionTranscript } from '@/api/client';
+import type { EventRecord } from '@/api/client';
+import type { SocketStatus } from '@/hooks/useSessionSocket';
 
 interface ParsedFrame {
   type?: string;
@@ -67,13 +71,25 @@ function toEntries(
   return entries;
 }
 
-export function Transcript({ sessionId }: { sessionId: string }) {
-  const { events, reconnecting } = useSessionTranscript(sessionId);
+export function Transcript({
+  events,
+  status,
+  invalidToken,
+}: {
+  events: EventRecord[];
+  status: SocketStatus;
+  invalidToken: boolean;
+}) {
   const entries = useMemo(() => toEntries(events), [events]);
 
   return (
     <div>
-      {reconnecting && (
+      {invalidToken && (
+        <p role="alert" className="mb-2 text-xs text-red-600">
+          Session token invalid, reload the page to reconnect.
+        </p>
+      )}
+      {!invalidToken && status === 'reconnecting' && (
         <p role="status" className="mb-2 text-xs text-amber-600">
           Reconnecting…
         </p>

@@ -19,7 +19,8 @@ export type DerivedStatus =
   | 'running'
   | 'stopped'
   | 'failed'
-  | 'archived';
+  | 'archived'
+  | 'pending_bootstrap';
 
 const BADGE: Record<
   DerivedStatus,
@@ -38,15 +39,26 @@ const BADGE: Record<
     label: 'archived',
     className: 'text-muted-foreground',
   },
+  pending_bootstrap: {
+    symbol: '◌',
+    label: 'setting up…',
+    className: 'animate-pulse text-amber-600',
+  },
 };
 
 /**
  * Derives the dashboard's status badge from `sessions.status` and the live sandbox phase.
  * `archived` always wins (a stopped, archived session is still "archived", not "stopped").
- * With no live phase yet (`null`) an `active` session shows as `active`; anything else falls
- * back to `stopped`. A `dead` container phase means the process crashed (`failed`); `exited`
- * covers a clean/expected stop; every other Docker phase (`created`, `running`, `restarting`,
- * `paused`, `removing`) is still doing something, so it renders as `running`.
+ * `pending_bootstrap-failed` always renders as `failed`, regardless of `dockerPhase` (no
+ * container was ever spawned, so `dockerPhase` is `null`, but this must not be confused with a
+ * cleanly stopped session). A `pending_bootstrap` session with no live phase yet renders as its
+ * own distinct `pending_bootstrap` state ("setting up…") — the create flow's 202-then-async-settle
+ * behavior must be visible, not silently identical to `active`/`stopped`. Once a container phase
+ * exists (bootstrap has produced a sandbox), the usual phase-derived rules below take over even
+ * for a still-`pending_bootstrap` row. A `dead` container phase means the process crashed
+ * (`failed`); `exited` covers a clean/expected stop; every other Docker phase (`created`,
+ * `running`, `restarting`, `paused`, `removing`) is still doing something, so it renders as
+ * `running`.
  * @param sessionStatus - `sessions.status` column value.
  * @param dockerPhase - Live `docker inspect` `.State.Status`, or `null` if unknown.
  * @returns The derived badge state.
@@ -56,8 +68,12 @@ export function deriveStatus(
   dockerPhase: DockerPhase,
 ): DerivedStatus {
   if (sessionStatus === 'archived') return 'archived';
-  if (dockerPhase === null)
-    return sessionStatus === 'active' ? 'active' : 'stopped';
+  if (sessionStatus === 'pending_bootstrap-failed') return 'failed';
+  if (dockerPhase === null) {
+    if (sessionStatus === 'active') return 'active';
+    if (sessionStatus === 'pending_bootstrap') return 'pending_bootstrap';
+    return 'stopped';
+  }
   if (dockerPhase === 'dead') return 'failed';
   if (dockerPhase === 'exited') return 'stopped';
   return 'running';

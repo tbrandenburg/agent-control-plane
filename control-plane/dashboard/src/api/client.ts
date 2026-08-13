@@ -9,7 +9,6 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
 
 export interface Session {
   id: string;
@@ -49,6 +48,7 @@ export interface CreateSessionInput {
   repoName: string;
   model: string;
   reasoningEffort?: string;
+  teamConfigRepo?: string;
 }
 
 export interface PromptInput {
@@ -95,22 +95,9 @@ export function fetchModels(): Promise<{ models: ModelOption[] }> {
   return request('/api/models');
 }
 
-export interface EventsPage {
-  events: EventRecord[];
-  nextCursor: string | null;
-}
-
-export function fetchSessionEvents(
-  id: string,
-  cursor: string | null,
-): Promise<EventsPage> {
-  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
-  return request(`/api/sessions/${id}/events${query}`);
-}
-
 export function createSession(
   input: CreateSessionInput,
-): Promise<{ id: string }> {
+): Promise<{ id: string; wsToken: string }> {
   return request('/api/sessions', {
     method: 'POST',
     body: JSON.stringify(input),
@@ -122,6 +109,33 @@ export function sendPrompt(id: string, input: PromptInput): Promise<unknown> {
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+export function stopSession(id: string): Promise<unknown> {
+  return request(`/api/sessions/${id}/stop`, { method: 'POST' });
+}
+
+export function archiveSession(id: string): Promise<unknown> {
+  return request(`/api/sessions/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'archived' }),
+  });
+}
+
+/**
+ * The `wsToken` (ARCHITECTURE.md §6) is only ever returned once, from `POST /api/sessions`'s
+ * response — this phase's backend has no rotation/hashing yet (a declared shortcut), so
+ * `GET /api/sessions/:id` never re-exposes it. `sessionStorage` (tab-scoped, not persisted across
+ * browser restarts) is the simplest place to hold it for the WS connection on `/sessions/:id`.
+ */
+const WS_TOKEN_PREFIX = 'acp:wsToken:';
+
+export function storeWsToken(sessionId: string, wsToken: string): void {
+  sessionStorage.setItem(`${WS_TOKEN_PREFIX}${sessionId}`, wsToken);
+}
+
+export function getStoredWsToken(sessionId: string): string | null {
+  return sessionStorage.getItem(`${WS_TOKEN_PREFIX}${sessionId}`);
 }
 
 export function useSessions(): UseQueryResult<
@@ -166,33 +180,22 @@ export function useSendPrompt(sessionId: string) {
   });
 }
 
-/**
- * Polls `GET /api/sessions/:id/events` every second and accumulates pages into a single
- * append-only transcript, advancing the `timestamp,id` cursor between polls (ARCHITECTURE.md
- * §4) — never re-sorted or re-fetched from the start, and never dropping already-seen events.
- * @param sessionId - Session whose events to poll.
- * @returns Accumulated events plus a `reconnecting` flag for non-blocking poll-failure UX.
- */
-export function useSessionTranscript(sessionId: string): {
-  events: EventRecord[];
-  reconnecting: boolean;
-} {
-  const [events, setEvents] = useState<EventRecord[]>([]);
-  const cursorRef = useRef<string | null>(null);
-
-  const query = useQuery({
-    queryKey: ['sessionEvents', sessionId],
-    queryFn: () => fetchSessionEvents(sessionId, cursorRef.current),
-    refetchInterval: 1000,
+export function useStopSession(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => stopSession(sessionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
+    },
   });
+}
 
-  useEffect(() => {
-    if (!query.data) return;
-    const { events: page, nextCursor } = query.data;
-    if (page.length === 0) return;
-    setEvents((prev) => [...prev, ...page]);
-    cursorRef.current = nextCursor;
-  }, [query.data]);
-
-  return { events, reconnecting: query.isError };
+export function useArchiveSession(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => archiveSession(sessionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
+    },
+  });
 }

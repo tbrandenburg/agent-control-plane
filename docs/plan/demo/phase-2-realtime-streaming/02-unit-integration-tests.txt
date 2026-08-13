@@ -1,0 +1,227 @@
+
+> agent-control-plane@0.0.1 test:all /home/tom/workspace/ai/made/workspace/agent-control-plane
+> pnpm -r run test && pnpm run test:scripts
+
+Scope: 4 of 5 workspace projects
+control-plane test$ vitest run
+control-plane/dashboard test$ vitest run
+control-plane/dashboard test:  RUN  v4.1.10 /home/tom/workspace/ai/made/workspace/agent-control-plane/control-plane/dashboard
+control-plane test:  RUN  v4.1.10 /home/tom/workspace/ai/made/workspace/agent-control-plane/control-plane
+control-plane test:  ❯ src/sandbox.test.js (28 tests | 1 failed) 25162ms
+control-plane test:      × runs, inspects as running, and waits for health against a real container 24783ms
+control-plane test: warning: You appear to have cloned an empty repository.
+control-plane test: warning: You appear to have cloned an empty repository.
+control-plane test:  ❯ src/bootstrap.test.js (22 tests | 1 failed) 10313ms
+control-plane test:      × sparse mode restricts the checkout to .opencode via cone-mode sparse-checkout 1649ms
+control-plane test: (node:2780318) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+control-plane test: (Use `node --trace-warnings ...` to show where the warning was created)
+control-plane test: {"level":30,"time":1786622459374,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/api/sessions","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622459526,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/api/sessions?status=archived","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622459648,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/api/sessions?limit=1&offset=1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622459773,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/api/sessions?limit=not-a-number","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622460758,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/api/sessions?offset=-1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622460900,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/api/sessions/sess-1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622461080,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/api/sessions/does-not-exist","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622461369,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/api/sessions/does-not-exist/events","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622461616,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/api/sessions/sess-1/events?limit=2","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622462084,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/api/sessions/sess-1/events?cursor=not-valid-base64url!!!","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622462182,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622459397,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":17.75669999999991,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622459527,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":1.1131169999998747,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622459652,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":0.892095999999583,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622459775,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":400},"responseTime":2.0263420000001133,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622460762,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":400},"responseTime":1.2947730000005322,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622460909,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":1.4827419999992344,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622461085,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":404},"responseTime":2.41283999999996,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622461383,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":404},"responseTime":6.34610100000009,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622461619,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":1.6254539999999906,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622461621,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-2","req":{"method":"GET","url":"/api/sessions/sess-1/events?limit=2&cursor=MjAyNC0wMS0wMVQwMDowMDowMS4wMDBaADI","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622461623,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-2","res":{"statusCode":200},"responseTime":1.3851830000003247,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622462088,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":400},"responseTime":2.2689089999994394,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622462260,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":202},"responseTime":77.03216299999985,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622462359,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622462370,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":202},"responseTime":10.8323649999993,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622462616,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622462646,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":202},"responseTime":28.799003000000084,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622462780,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622462786,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":400},"responseTime":5.514470000000074,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622463183,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622463225,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":400},"responseTime":42.14357000000018,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622463532,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622463712,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622463547,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":400},"responseTime":12.63819500000136,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622463952,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622463737,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":400},"responseTime":24.53079600000092,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622463967,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":202},"responseTime":14.780695999999807,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622464124,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622464145,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":202},"responseTime":18.57047000000057,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622464343,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622464357,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":202},"responseTime":14.390534000000116,"msg":"request completed"}
+control-plane/dashboard test:  Test Files  6 passed (6)
+control-plane/dashboard test:       Tests  26 passed (26)
+control-plane/dashboard test:    Start at  14:00:13
+control-plane/dashboard test:    Duration  51.39s (transform 1.96s, setup 0ms, import 10.12s, tests 7.30s, environment 27.53s)
+control-plane test: {"level":30,"time":1786622464614,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions/does-not-exist/stop","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622464769,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions/sess-1/stop","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane/dashboard test: Done
+sandbox test$ node --test *.test.js
+control-plane test: {"level":30,"time":1786622464861,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions/sess-1/stop","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622465158,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions/sess-1/stop","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622465216,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"PATCH","url":"/api/sessions/does-not-exist","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622464620,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":404},"responseTime":6.40749599999981,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622464773,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":409},"responseTime":1.4420999999983906,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622464862,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":0.5201390000001993,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622465159,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":502},"responseTime":0.5596679999998742,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622465293,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"PATCH","url":"/api/sessions/sess-1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622465222,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":404},"responseTime":3.9572169999992184,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622465296,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":400},"responseTime":2.2580890000008367,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622465356,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"PATCH","url":"/api/sessions/sess-1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622465375,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":18.931710999999268,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622465536,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"PATCH","url":"/api/sessions/sess-1","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622465623,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":87.03749999999854,"msg":"request completed"}
+sandbox test: [bridge] starting bridge
+sandbox test: ▶ splitModel
+sandbox test:   ✔ splits on the first slash only, keeping further slashes in modelID (4.193904ms)
+sandbox test: ✔ splitModel (9.0865ms)
+sandbox test: ▶ buildPromptBody
+sandbox test:   ✔ omits variant entirely when reasoningEffort is unset (1.139745ms)
+sandbox test:   ✔ includes variant when reasoningEffort is set (0.55608ms)
+sandbox test: ✔ buildPromptBody (2.24973ms)
+sandbox test: ▶ SseFrameBuffer
+sandbox test:   ✔ buffers a frame split across chunk boundaries until the blank-line delimiter arrives (1.008852ms)
+sandbox test:   ✔ yields multiple frames present in a single chunk (0.395614ms)
+sandbox test: ✔ SseFrameBuffer (1.834435ms)
+sandbox test: ▶ parseFrame
+sandbox test:   ✔ parses a plain data: frame with no event: field (3.070572ms)
+sandbox test:   ✔ returns null for a frame with no data line (3.501618ms)
+sandbox test: ✔ parseFrame (7.189808ms)
+sandbox test: [bridge] connected to opencode
+control-plane test: {"level":30,"time":1786622466022,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions/does-not-exist/prompt","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622466028,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":404},"responseTime":4.419625000000451,"msg":"request completed"}
+sandbox test: [bridge] session ready
+control-plane test: {"level":30,"time":1786622466446,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions/sess-1/prompt","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+sandbox test: ▶ createBridge integration
+sandbox test:   ✔ reports the freshly created opencode session id exactly once (2.949251ms)
+sandbox test:   ✔ forwards every frame for the bridge session verbatim, including message.part.delta (0.519761ms)
+sandbox test:   ✔ filters out frames for a different sessionID (0.364037ms)
+sandbox test:   ✔ never forwards server.connected/heartbeat keepalive frames (0.208515ms)
+control-plane test: {"level":30,"time":1786622466601,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions/sess-1/prompt","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622466464,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":16.30493900000147,"msg":"request completed"}
+sandbox test: [bridge] SSE relay error: This operation was aborted
+sandbox test:   ✔ answers GET /global/health once ready (256.249696ms)
+sandbox test: [bridge] starting bridge
+sandbox test: ✔ createBridge integration (812.776759ms)
+control-plane test: {"level":30,"time":1786622466703,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/api/sessions/sess-1/prompt","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622466643,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":503},"responseTime":41.4819750000006,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622466705,"pid":2780318,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":503},"responseTime":2.1994620000004943,"msg":"request completed"}
+sandbox test: [bridge] connected to opencode
+sandbox test: [bridge] session ready
+sandbox test: [bridge] received stop
+sandbox test: ▶ createBridge POST /stop
+sandbox test:   ✔ proxies to opencode's POST /session/:id/abort (148.572757ms)
+sandbox test: [bridge] received prompt
+sandbox test: [bridge] received stop
+sandbox test: [bridge] SSE relay error: This operation was aborted
+sandbox test:   ✔ still succeeds after a prompt has been sent on the same session (55.818087ms)
+sandbox test: ✔ createBridge POST /stop (300.799537ms)
+sandbox test: ℹ tests 14
+sandbox test: ℹ suites 6
+sandbox test: ℹ pass 14
+sandbox test: ℹ fail 0
+sandbox test: ℹ cancelled 0
+sandbox test: ℹ skipped 0
+sandbox test: ℹ todo 0
+sandbox test: ℹ duration_ms 2105.987635
+sandbox test: Done
+control-plane test: (node:2780822) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+control-plane test: (Use `node --trace-warnings ...` to show where the warning was created)
+control-plane test: {"level":30,"time":1786622468704,"pid":2780822,"hostname":"tom-nuc7","msg":"Server listening at http://127.0.0.1:42729"}
+control-plane test: {"level":30,"time":1786622468879,"pid":2780822,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/ws/sessions/sess-1","host":"127.0.0.1:42729","remoteAddress":"127.0.0.1","remotePort":35838},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622469147,"pid":2780822,"hostname":"tom-nuc7","msg":"Server listening at http://127.0.0.1:41875"}
+control-plane test: {"level":30,"time":1786622469165,"pid":2780822,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/ws/sessions/sess-1","host":"127.0.0.1:41875","remoteAddress":"127.0.0.1","remotePort":36258},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622469238,"pid":2780822,"hostname":"tom-nuc7","msg":"Server listening at http://127.0.0.1:36337"}
+control-plane test: {"level":30,"time":1786622469248,"pid":2780822,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/ws/sessions/sess-1","host":"127.0.0.1:36337","remoteAddress":"127.0.0.1","remotePort":43802},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622469322,"pid":2780822,"hostname":"tom-nuc7","msg":"Server listening at http://127.0.0.1:41589"}
+control-plane test: {"level":30,"time":1786622469336,"pid":2780822,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/ws/sessions/sess-1","host":"127.0.0.1:41589","remoteAddress":"127.0.0.1","remotePort":37798},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622469346,"pid":2780822,"hostname":"tom-nuc7","reqId":"req-2","req":{"method":"GET","url":"/ws/sessions/sess-1","host":"127.0.0.1:41589","remoteAddress":"127.0.0.1","remotePort":37810},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622469561,"pid":2780822,"hostname":"tom-nuc7","msg":"Server listening at http://127.0.0.1:35049"}
+control-plane test: {"level":30,"time":1786622469587,"pid":2780822,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/ws/sessions/sess-1","host":"127.0.0.1:35049","remoteAddress":"127.0.0.1","remotePort":59730},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622469752,"pid":2780822,"hostname":"tom-nuc7","msg":"Server listening at http://127.0.0.1:42223"}
+control-plane test: {"level":30,"time":1786622469778,"pid":2780822,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/ws/sessions/sess-1","host":"127.0.0.1:42223","remoteAddress":"127.0.0.1","remotePort":37570},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622469943,"pid":2780822,"hostname":"tom-nuc7","msg":"Server listening at http://127.0.0.1:46383"}
+control-plane test: {"level":30,"time":1786622469959,"pid":2780822,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/ws/sessions/sess-1","host":"127.0.0.1:46383","remoteAddress":"127.0.0.1","remotePort":37496},"msg":"incoming request"}
+control-plane test: (node:2780926) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+control-plane test: (Use `node --trace-warnings ...` to show where the warning was created)
+control-plane test: {"level":30,"time":1786622472420,"pid":2780926,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/internal/sessions/sess-1/events","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622472531,"pid":2780926,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/internal/sessions/missing/events","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622472453,"pid":2780926,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":201},"responseTime":26.049113000000034,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622472535,"pid":2780926,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":404},"responseTime":4.391424999999799,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622472590,"pid":2780926,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/internal/sessions/sess-1/oc-session","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622472606,"pid":2780926,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":14.282193000000007,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622472659,"pid":2780926,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/internal/sessions/sess-1/oc-session","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622472663,"pid":2780926,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":409},"responseTime":3.5395129999997152,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622472723,"pid":2780926,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/internal/sessions/sess-1/oc-session","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622472726,"pid":2780926,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":2.748109999999997,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622472763,"pid":2780926,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"POST","url":"/internal/sessions/missing/oc-session","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622472765,"pid":2780926,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":404},"responseTime":1.7867930000002161,"msg":"request completed"}
+control-plane test: (node:2781073) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+control-plane test: (Use `node --trace-warnings ...` to show where the warning was created)
+control-plane test: {"level":30,"time":1786622474308,"pid":2781073,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/sessions/new","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622474334,"pid":2781073,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":23.445441999999957,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622474363,"pid":2781073,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/sessions","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622474369,"pid":2781073,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":5.532743999999866,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622474389,"pid":2781073,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/sessions/","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622474406,"pid":2781073,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":16.853701999999885,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622474442,"pid":2781073,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/nonexistent-route","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622474450,"pid":2781073,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":7.730265999999801,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622474473,"pid":2781073,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/sessions/new/extra","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622474478,"pid":2781073,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":4.43351500000017,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622474498,"pid":2781073,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/api/nonexistent","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622474500,"pid":2781073,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":404},"responseTime":1.7285170000000107,"msg":"request completed"}
+control-plane test: {"level":30,"time":1786622474513,"pid":2781073,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/internal/nonexistent","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622474515,"pid":2781073,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":404},"responseTime":1.094333000000006,"msg":"request completed"}
+control-plane test: (node:2781144) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+control-plane test: (Use `node --trace-warnings ...` to show where the warning was created)
+control-plane test: {"level":30,"time":1786622476296,"pid":2781144,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/api/models","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622476412,"pid":2781144,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":12.361709999999903,"msg":"request completed"}
+control-plane test: (node:2781224) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+control-plane test: (Use `node --trace-warnings ...` to show where the warning was created)
+control-plane test: {"level":30,"time":1786622478137,"pid":2781224,"hostname":"tom-nuc7","reqId":"req-1","req":{"method":"GET","url":"/health","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+control-plane test: {"level":30,"time":1786622478168,"pid":2781224,"hostname":"tom-nuc7","reqId":"req-1","res":{"statusCode":200},"responseTime":28.838886000000002,"msg":"request completed"}
+control-plane test: (node:2781303) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+control-plane test: (Use `node --trace-warnings ...` to show where the warning was created)
+control-plane test: (node:2781366) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+control-plane test: (Use `node --trace-warnings ...` to show where the warning was created)
+control-plane test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+control-plane test:  FAIL  src/bootstrap.test.js > cloneAndCheckout (real git fetch/checkout) > sparse mode restricts the checkout to .opencode via cone-mode sparse-checkout
+control-plane test: AssertionError: expected [ '.git', '.opencode', 'other.txt' ] to not include 'other.txt'
+control-plane test:  ❯ src/bootstrap.test.js:180:25
+control-plane test:     178|     const entries = readdirSync(dest);
+control-plane test:     179|     expect(entries).toContain('.opencode');
+control-plane test:     180|     expect(entries).not.toContain('other.txt');
+control-plane test:        |                         ^
+control-plane test:     181|   });
+control-plane test:     182|
+control-plane test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+control-plane test:  FAIL  src/sandbox.test.js > real Docker integration > runs, inspects as running, and waits for health against a real container
+control-plane test: AssertionError: promise rejected "Error: sandbox container sandbox-integrat…" instead of resolving
+control-plane test:  ❯ src/sandbox.test.js:602:6
+control-plane test:     600|     await expect(
+control-plane test:     601|       waitForHealth(NAME, { timeoutMs: 15000, intervalMs: 200 }),
+control-plane test:     602|     ).resolves.toEqual({ exists: true, state: 'running' });
+control-plane test:        |      ^
+control-plane test:     603|   }, 30000);
+control-plane test:     604| });
+control-plane test: Caused by: Error: sandbox container sandbox-integration-test did not become healthy within 15000ms
+control-plane test:  ❯ waitForHealth src/sandbox.js:225:13
+control-plane test:  ❯ src/sandbox.test.js:600:5
+control-plane test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+control-plane test:  Test Files  2 failed | 10 passed (12)
+control-plane test:       Tests  2 failed | 136 passed (138)
+control-plane test:    Start at  14:00:15
+control-plane test:    Duration  65.69s (transform 1.94s, setup 0ms, import 8.42s, tests 48.67s, environment 3ms)
+control-plane test: Failed
+/home/tom/workspace/ai/made/workspace/agent-control-plane/control-plane:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  control-plane@0.0.1 test: `vitest run`
+Exit status 1
+ ELIFECYCLE  Command failed with exit code 1.

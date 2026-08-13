@@ -13,7 +13,7 @@ vi.mock('node:child_process', async (importOriginal) => {
 });
 
 const childProcess = await import('node:child_process');
-const { containerName, inspect, run, waitForHealth } = await import(
+const { containerName, inspect, run, stop, waitForHealth } = await import(
   './sandbox.js'
 );
 
@@ -53,7 +53,6 @@ describe('run', () => {
 
     const env = {
       SANDBOX_IMAGE: 'agent-sandbox:local',
-      WORKSPACE_HOST_PATH: '/host/repo',
       SANDBOX_NETWORK: 'my-project_egress-net',
       CONTROL_PLANE_URL: 'http://control-plane:3000',
       LITELLM_BASE_URL: 'http://litellm:4000',
@@ -61,7 +60,12 @@ describe('run', () => {
     };
 
     const result = await run(
-      { id: 'sess-1', model: 'litellm/eu.anthropic.claude-sonnet-4-6' },
+      {
+        id: 'sess-1',
+        model: 'litellm/eu.anthropic.claude-sonnet-4-6',
+        targetDir: '/host/workspace/sess-1/target',
+        platformConfigDir: '/host/workspace/sess-1/platform',
+      },
       env,
     );
 
@@ -83,7 +87,9 @@ describe('run', () => {
       '--network',
       'my-project_egress-net',
       '-v',
-      '/host/repo:/workspace/repo:ro',
+      '/host/workspace/sess-1/target:/workspace/repo:ro',
+      '-v',
+      '/host/workspace/sess-1/platform:/root/.config/opencode',
       '-e',
       'SESSION_ID=sess-1',
       '-e',
@@ -92,13 +98,6 @@ describe('run', () => {
       `OPENCODE_CONFIG_CONTENT=${JSON.stringify({
         model: 'litellm/eu.anthropic.claude-sonnet-4-6',
         autoupdate: false,
-        provider: {
-          litellm: {
-            npm: '@ai-sdk/openai-compatible',
-            options: { baseURL: 'http://litellm:4000', apiKey: 'secret-key' },
-            models: { 'eu.anthropic.claude-sonnet-4-6': {} },
-          },
-        },
       })}`,
       '-e',
       'LITELLM_BASE_URL=http://litellm:4000',
@@ -108,19 +107,110 @@ describe('run', () => {
     ]);
   });
 
+  it('bind-mounts and points OPENCODE_CONFIG_DIR at the team config dir when present', async () => {
+    vi.mocked(childProcess.spawn).mockReturnValue(
+      fakeChild({ stdout: 'id\n' }),
+    );
+
+    await run(
+      {
+        id: 's',
+        model: 'litellm/x',
+        targetDir: '/host/target',
+        platformConfigDir: '/host/platform',
+        teamConfigDir: '/host/team',
+      },
+      { SANDBOX_IMAGE: 'img' },
+    );
+
+    const [, args] = vi.mocked(childProcess.spawn).mock.calls[0];
+    expect(args).toContain('-v');
+    expect(args).toContain('/host/team:/workspace/team-config');
+    expect(args).toContain('OPENCODE_CONFIG_DIR=/workspace/team-config');
+  });
+
   it('falls back to the bare egress-net name when SANDBOX_NETWORK is unset', async () => {
     vi.mocked(childProcess.spawn).mockReturnValue(
       fakeChild({ stdout: 'id\n' }),
     );
 
     await run(
-      { id: 's', model: 'litellm/x' },
-      { SANDBOX_IMAGE: 'img', WORKSPACE_HOST_PATH: '/host' },
+      {
+        id: 's',
+        model: 'litellm/x',
+        targetDir: '/host/target',
+        platformConfigDir: '/host/platform',
+      },
+      { SANDBOX_IMAGE: 'img' },
     );
 
     const [, args] = vi.mocked(childProcess.spawn).mock.calls[0];
     expect(args[args.indexOf('--network') + 1]).toBe('egress-net');
   });
+
+  it.each([
+    'litellm/eu.anthropic.claude-sonnet-4-6',
+    'anthropic/claude-opus-4',
+    'openai/gpt-5',
+  ])(
+    'composes OPENCODE_CONFIG_CONTENT with exactly model + autoupdate, nothing provider-shaped, for %s',
+    async (model) => {
+      vi.mocked(childProcess.spawn).mockReturnValue(
+        fakeChild({ stdout: 'id\n' }),
+      );
+
+      await run(
+        {
+          id: 's',
+          model,
+          targetDir: '/host/target',
+          platformConfigDir: '/host/platform',
+        },
+        { SANDBOX_IMAGE: 'img' },
+      );
+
+      const [, args] = vi.mocked(childProcess.spawn).mock.calls[0];
+      const raw = args
+        .find((arg) => arg.startsWith('OPENCODE_CONFIG_CONTENT='))
+        .slice('OPENCODE_CONFIG_CONTENT='.length);
+      const parsed = JSON.parse(raw);
+      expect(parsed).toEqual({ model, autoupdate: false });
+      expect(Object.keys(parsed).sort()).toEqual(['autoupdate', 'model']);
+    },
+  );
+
+  it(
+    'composes the same narrowed OPENCODE_CONFIG_CONTENT shape regardless of LITELLM_* env vars ' +
+      '(Option C: no gateway/provider default is ever injected by the control plane)',
+    async () => {
+      vi.mocked(childProcess.spawn).mockReturnValue(
+        fakeChild({ stdout: 'id\n' }),
+      );
+
+      await run(
+        {
+          id: 's',
+          model: 'litellm/x',
+          targetDir: '/host/target',
+          platformConfigDir: '/host/platform',
+        },
+        {
+          SANDBOX_IMAGE: 'img',
+          LITELLM_BASE_URL: 'http://litellm:4000',
+          LITELLM_API_KEY: 'secret-key',
+        },
+      );
+
+      const [, args] = vi.mocked(childProcess.spawn).mock.calls[0];
+      const raw = args
+        .find((arg) => arg.startsWith('OPENCODE_CONFIG_CONTENT='))
+        .slice('OPENCODE_CONFIG_CONTENT='.length);
+      expect(JSON.parse(raw)).toEqual({
+        model: 'litellm/x',
+        autoupdate: false,
+      });
+    },
+  );
 
   it('rejects with the trimmed docker stderr on a non-zero exit', async () => {
     vi.mocked(childProcess.spawn).mockReturnValue(
@@ -129,23 +219,49 @@ describe('run', () => {
 
     await expect(
       run(
-        { id: 's', model: 'litellm/x' },
-        { SANDBOX_IMAGE: 'img', WORKSPACE_HOST_PATH: '/host' },
+        {
+          id: 's',
+          model: 'litellm/x',
+          targetDir: '/host/target',
+          platformConfigDir: '/host/platform',
+        },
+        { SANDBOX_IMAGE: 'img' },
       ),
     ).rejects.toThrow('Error: no such image');
   });
 
   it('throws without spawning when SANDBOX_IMAGE is missing', async () => {
     await expect(
-      run({ id: 's', model: 'litellm/x' }, { WORKSPACE_HOST_PATH: '/host' }),
+      run(
+        {
+          id: 's',
+          model: 'litellm/x',
+          targetDir: '/host/target',
+          platformConfigDir: '/host/platform',
+        },
+        {},
+      ),
     ).rejects.toThrow('SANDBOX_IMAGE');
     expect(childProcess.spawn).not.toHaveBeenCalled();
   });
 
-  it('throws without spawning when WORKSPACE_HOST_PATH is missing', async () => {
+  it('throws without spawning when session.targetDir is missing', async () => {
     await expect(
-      run({ id: 's', model: 'litellm/x' }, { SANDBOX_IMAGE: 'img' }),
-    ).rejects.toThrow('WORKSPACE_HOST_PATH');
+      run(
+        { id: 's', model: 'litellm/x', platformConfigDir: '/host/platform' },
+        { SANDBOX_IMAGE: 'img' },
+      ),
+    ).rejects.toThrow('targetDir');
+    expect(childProcess.spawn).not.toHaveBeenCalled();
+  });
+
+  it('throws without spawning when session.platformConfigDir is missing', async () => {
+    await expect(
+      run(
+        { id: 's', model: 'litellm/x', targetDir: '/host/target' },
+        { SANDBOX_IMAGE: 'img' },
+      ),
+    ).rejects.toThrow('platformConfigDir');
     expect(childProcess.spawn).not.toHaveBeenCalled();
   });
 });
@@ -302,6 +418,75 @@ describe('waitForHealth', () => {
   });
 });
 
+describe('stop', () => {
+  it('stops via the bridge proxy and never calls docker stop when the bridge responds ok', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 200 }));
+
+    await expect(
+      stop('sandbox-1', { fetchImpl, timeoutMs: 1000 }),
+    ).resolves.toEqual({ method: 'bridge' });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'http://sandbox-1:8080/stop',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(childProcess.spawn).not.toHaveBeenCalled();
+  });
+
+  it('falls back to docker stop when the bridge call rejects (e.g. connection refused)', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+    vi.mocked(childProcess.spawn).mockImplementation(() =>
+      fakeChild({ stdout: 'sandbox-1\n' }),
+    );
+
+    await expect(
+      stop('sandbox-1', { fetchImpl, timeoutMs: 1000 }),
+    ).resolves.toEqual({ method: 'docker' });
+
+    expect(childProcess.spawn).toHaveBeenCalledWith('docker', [
+      'stop',
+      'sandbox-1',
+    ]);
+  });
+
+  it('falls back to docker stop once the bridge-response timeout fires', async () => {
+    const fetchImpl = vi.fn(
+      (_url, { signal } = {}) =>
+        new Promise((_resolve, reject) => {
+          // Never settles on its own — matches a genuinely unresponsive bridge; only the
+          // `AbortController`'s bounded timeout ends it, exactly like a real `fetch` would reject
+          // once its `signal` aborts.
+          signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    );
+    vi.mocked(childProcess.spawn).mockImplementation(() =>
+      fakeChild({ stdout: 'sandbox-1\n' }),
+    );
+
+    await expect(
+      stop('sandbox-1', { fetchImpl, timeoutMs: 20 }),
+    ).resolves.toEqual({ method: 'docker' });
+
+    expect(childProcess.spawn).toHaveBeenCalledWith('docker', [
+      'stop',
+      'sandbox-1',
+    ]);
+  });
+
+  it('propagates the docker stop error when both the bridge and the fallback fail', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+    vi.mocked(childProcess.spawn).mockImplementation(() =>
+      fakeChild({ stderr: 'Error: No such container: sandbox-1', exitCode: 1 }),
+    );
+
+    await expect(
+      stop('sandbox-1', { fetchImpl, timeoutMs: 1000 }),
+    ).rejects.toThrow(/No such container/);
+  });
+});
+
 // Integration: against real Docker, using the actual sandbox image built by `make sandbox-image`.
 // Skipped when that image hasn't been built (e.g. a bare `pnpm test` without the Make target),
 // so the unit tests above stay runnable without Docker/image-build overhead.
@@ -389,13 +574,17 @@ describe.runIf(sandboxImageExists())('real Docker integration', () => {
 
     const env = {
       SANDBOX_IMAGE,
-      WORKSPACE_HOST_PATH: process.cwd(),
       SANDBOX_NETWORK: NETWORK,
       CONTROL_PLANE_URL: `http://${FAKE_CONTROL_PLANE_NAME}:${FAKE_CONTROL_PLANE_PORT}`,
     };
 
     const started = await run(
-      { id: 'integration-test', model: 'litellm/x' },
+      {
+        id: 'integration-test',
+        model: 'litellm/x',
+        targetDir: process.cwd(),
+        platformConfigDir: process.cwd(),
+      },
       env,
     );
     expect(started.containerName).toBe(NAME);

@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest';
 import '@testing-library/jest-dom';
 import { type DockerPhase, deriveStatus, StatusBadge } from './StatusBadge';
 
-const SESSION_STATUSES = ['active', 'archived', 'pending_bootstrap'] as const;
+const SESSION_STATUSES = [
+  'active',
+  'archived',
+  'pending_bootstrap',
+  'pending_bootstrap-failed',
+] as const;
 const DOCKER_PHASES: DockerPhase[] = [
   null,
   'created',
@@ -24,7 +29,16 @@ describe('deriveStatus', () => {
 
   it('returns active for a non-archived session with no known docker phase', () => {
     expect(deriveStatus('active', null)).toBe('active');
-    expect(deriveStatus('pending_bootstrap', null)).toBe('stopped');
+  });
+
+  it('returns pending_bootstrap for a bootstrapping session with no docker phase yet', () => {
+    expect(deriveStatus('pending_bootstrap', null)).toBe('pending_bootstrap');
+  });
+
+  it('always returns failed for a failed bootstrap session, regardless of docker phase', () => {
+    for (const phase of DOCKER_PHASES) {
+      expect(deriveStatus('pending_bootstrap-failed', phase)).toBe('failed');
+    }
   });
 
   it('maps a dead container to failed', () => {
@@ -69,9 +83,14 @@ describe('deriveStatus', () => {
       SESSION_STATUSES.length * DOCKER_PHASES.length,
     );
     for (const { result } of expected) {
-      expect(['active', 'running', 'stopped', 'failed', 'archived']).toContain(
-        result,
-      );
+      expect([
+        'active',
+        'running',
+        'stopped',
+        'failed',
+        'archived',
+        'pending_bootstrap',
+      ]).toContain(result);
     }
   });
 });
@@ -96,5 +115,22 @@ describe('StatusBadge', () => {
   it('renders the failed label for a dead container', () => {
     render(<StatusBadge sessionStatus="active" dockerPhase="dead" />);
     expect(screen.getByText('failed')).toBeInTheDocument();
+  });
+
+  it('renders the failed label for a bootstrap-failed session with no docker phase', () => {
+    render(
+      <StatusBadge
+        sessionStatus="pending_bootstrap-failed"
+        dockerPhase={null}
+      />,
+    );
+    expect(screen.getByText('failed')).toBeInTheDocument();
+  });
+
+  it('renders a distinct "setting up…" label for a pending_bootstrap session, not active/stopped', () => {
+    render(
+      <StatusBadge sessionStatus="pending_bootstrap" dockerPhase={null} />,
+    );
+    expect(screen.getByText('setting up…')).toBeInTheDocument();
   });
 });

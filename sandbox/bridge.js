@@ -258,6 +258,37 @@ export function createBridge({
       return;
     }
 
+    if (req.method === 'POST' && req.url === '/stop') {
+      (async () => {
+        try {
+          if (!ocSessionId) {
+            // Nothing to abort yet (never prompted) — a clean no-op, not an error.
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ status: 'no-op' }));
+            return;
+          }
+          log('received stop');
+          const abortRes = await postJSON(
+            `${ocUrl}/session/${ocSessionId}/abort`,
+            {},
+          );
+          const payload = await abortRes.json().catch(() => ({}));
+          res.writeHead(abortRes.status, {
+            'content-type': 'application/json',
+          });
+          res.end(JSON.stringify(payload));
+        } catch (err) {
+          res.writeHead(502, { 'content-type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              error: err instanceof Error ? err.message : String(err),
+            }),
+          );
+        }
+      })();
+      return;
+    }
+
     res.writeHead(404, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ error: 'NOT_FOUND' }));
   });

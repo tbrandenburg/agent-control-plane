@@ -11,8 +11,29 @@
 - [Phase 0 — Project Setup](docs/phase_00_plan.md)
 - [Phase 1 — Spawn an Agent From the Dashboard](docs/phase_01_plan.md)
 
+## Validation Conventions
+
+- **Model-resolution / config-composition changes require a real E2E gate in the same step.**
+  Any implementation step whose `Changes` touch model-resolution or config-composition logic
+  (non-exhaustive examples: `OPENCODE_CONFIG_CONTENT` composition, bootstrap/clone wiring,
+  provider defaults, `LITELLM_*`/`OPENCODE_*` env vars passed into the sandbox container) **must**
+  include a real, executed end-to-end prompt check in its own `Validation` → `Commands` — at
+  minimum, a single real prompt against a real, already-passing session scenario (e.g.
+  `opencode/big-pickle`, per step `00602`) proving a model still resolves. This check is required
+  in that same step, not deferred solely to the phase's final E2E step. Background: step `00200`
+  changed model-resolution logic with only `pnpm --filter control-plane test` (unit-level)
+  validation; the regression this introduced went undetected for four subsequent `closed` steps
+  until step `00600`'s real E2E run caught it (see `docs/phase_02_findings.md` and
+  [§8](docs/ARCHITECTURE.md) for the corrected precedence-chain analysis this rule protects).
+
 ## Key Pitfalls
 
+- A step file's presence in `docs/plan/steps/in-review/` (or even `closed/`) is not proof any of its
+  code exists — step 00400 (WebSocket subset) was found in `in-review/` with zero corresponding
+  implementation: no `ws.js`/`ws.test.js`, no `@fastify/websocket` dependency, no shared prompt
+  function, no `broadcastToSession` call, and no matching commit in `git log`. Always independently
+  verify the specific files a step claims to create/modify exist on disk (`ls`, `git log -- <path>`)
+  before trusting its status or running its validation commands.
 - A step file's presence in `docs/plan/steps/closed/` is not proof its prerequisites were met — a
   gap step (00501) explicitly conditioned moving 00500 to `closed/` on its own action items being
   verified complete first, yet 00500 was found in `closed/` while none of those actions were ever
@@ -125,6 +146,173 @@
   on exactly that drift. Reproduced live: a subagent-written multi-line `for`/`test(...)` block in
   `e2e/tests/smoke.spec.ts` passed local `pnpm run lint` (which reformatted it in place without
   ever showing a diff) but failed CI's lint job on the pushed, unformatted version. Before pushing,
-  run the CI-equivalent read-only `pnpm exec biome check .` (not `--write`) as a final gate, or
-  always `git diff` after `pnpm run lint` to confirm nothing needed fixing.
+   run the CI-equivalent read-only `pnpm exec biome check .` (not `--write`) as a final gate, or
+   always `git diff` after `pnpm run lint` to confirm nothing needed fixing.
+- A step's code and tests can cite a findings doc (e.g. `docs/phase_02_findings.md`'s "Option C
+  decision") by name in doc comments/test descriptions as their rationale source without that file
+  ever actually being created — grep for the exact filename across the repo before trusting a step
+  that references one; a plan step's own Validation section may require the doc to exist even
+  though the implementation code "looks done" and its own tests pass.
+- A gap step in `closed/` that documents "root-cause and fix `X`" (e.g. 00202's bootstrap
+  cone-mode sparse-checkout fix) is not proof the fix landed either — reproduced live: re-running
+  `pnpm --filter control-plane test` still fails `bootstrap.test.js`'s "sparse mode restricts the
+  checkout to .opencode" assertion identically to how 00202 itself described it, with `bootstrap.js`
+  unchanged. `git cone-mode` always includes top-level files in the repo root regardless of the
+  declared cone path, which is likely the actual root cause of the test's false assumption — but
+  since `bootstrap.js`/`bootstrap.test.js` are a different step's files, out-of-scope steps must not
+  silently inherit and "fix" a failure that isn't theirs; treat it as a pre-existing, orthogonal
+  failure (verify via `git stash` that it reproduces identically without your own changes) and
+  leave it for whichever step actually owns those files.
+- Registering `@fastify/websocket` with a bare `app.register(fastifyWebsocket)` (no `await`) and
+  then declaring a `{ websocket: true }` route in the same synchronous tick leaves
+  `request.params` (and every other route-scoped decoration) `undefined` inside the WS handler,
+  even after `await app.listen(...)`/`await app.ready()` — reproduced live with a minimal
+  standalone repro script. The plugin's `onRoute` hook (which wraps the route's handler to
+  branch on `request.raw[kWs]`) isn't attached yet when the route is added, so the raw,
+  unwrapped handler runs instead. Fix: wrap the plugin registration and the WS route
+  declaration in an encapsulated child plugin (`app.register(async (instance) => { await
+  instance.register(fastifyWebsocket); instance.get(path, { websocket: true }, handler); })`)
+  so the `await` completes before the route is declared, without having to make the outer
+  `buildServer()` itself async.
+- A step that fixes one file's Biome formatting drift (e.g. step 00402 fixing `ws.test.js`) does
+  not guarantee `pnpm exec biome check .` passes repo-wide afterward — reproduced live: the same
+  root-level command still failed on `control-plane/dashboard/src/components/StatusBadge.test.tsx`
+  (last touched by an unrelated Phase 1 commit). Always re-run the *root-level* `pnpm exec biome
+  check .` (not just the targeted file) after any formatting-drift fix step, and if it surfaces
+  drift in a file outside that step's own scope, raise it as its own separate gap step rather than
+  silently fixing or ignoring it.
+- `jsdom@29` (this repo's pinned dashboard test dependency) ships a real, network-attempting
+  `WebSocket` global — unlike `fetch`, which every dashboard test already stubs, an un-stubbed WS
+  hook test will try to open a real socket instead of throwing "not implemented". Any test that
+  renders a component using `useSessionSocket`/raw `WebSocket` must `vi.stubGlobal('WebSocket',
+  <FakeWebSocketClass>)` (a minimal `addEventListener`/`send`/`close`-only class collecting emitted
+  events) before rendering, mirroring the existing `vi.stubGlobal('fetch', ...)` pattern — otherwise
+  the test hangs or flakes on a real connection attempt instead of failing fast.
+- `GET /api/sessions/:id` (this phase's backend) never re-exposes `wsToken` — only `POST
+  /api/sessions`'s one-time response does (§6's no-rotation-yet shortcut is implemented literally:
+  no `ws_token_hash`/rotation columns exist). The dashboard must capture and persist the plaintext
+  token itself (e.g. `sessionStorage`, keyed by session id) at creation time for the WS hook to use
+  on `/sessions/:id` — there is no server-side way to recover it later, and a page opened directly
+  by URL (no stored token) is expected to render the "session token invalid, reload" state, not a
+  silent hang.
+- 2026-08-13: `control-plane/src/bootstrap.js`'s `bootstrapWorkspace()` (Phase 2 Step 1, closed) is
+  fully implemented and unit-tested (including real-network fixtures) but is never actually called
+  from `routes/sessions.js`'s `spawnSandbox()` (Step 3, closed) or anywhere else — `sandbox.js`'s
+  `run()` still bind-mounts the single, global, Phase-1-era `WORKSPACE_HOST_PATH` for every session,
+  so `POST /api/sessions`'s `repoOwner`/`repoName`/`teamConfigRepo` are validated but never actually
+  used to clone anything — a real, still-open gap (tracked as a recommended follow-up gap step, e.g.
+  `00601`, matching this repo's own `00201`/`00202`/`00301`/`00401` pattern) independent of whether
+  `make e2e` itself is green. **Do not confuse this with a model-provider/E2E-blocking issue** — see
+  the next bullet for how that part is actually resolved.
+- `litellm/stub-model` (Phase 1's e2e fixture model) requires a provider block only a real Platform
+  config repo supplies, which — per the bullet above — nothing in this stack ever clones; a live E2E
+  run against it produces `session.error` / `"ProviderModelNotFoundError: ... Model not found:
+  litellm/stub-model"`. The fix is not to build that wiring for E2E purposes: `opencode/big-pickle`
+  (and opencode's other bundled `*-free` models) is a real, free, zero-credential model `opencode`
+  resolves natively — no `auth.json` entry, no Platform-config-repo provider block, no
+  `LITELLM_BASE_URL`/API key required — confirmed live by running the sandbox image standalone with
+  only `OPENCODE_CONFIG_CONTENT='{"model":"opencode/big-pickle","autoupdate":false}'` and driving a
+  full real turn through `opencode serve`'s own API. Use `opencode/big-pickle` (or any other
+  zero-config bundled model — it is one convenient E2E-fixture option, not a pinned requirement) for
+  any E2E/dev scenario that needs a real, working model with zero config/credential setup. This is
+  purely an E2E-fixture choice — it says nothing about production model selection (unchanged,
+  already supports arbitrary `providerID/modelID`) or about a target repo's own
+  `opencode.json`/`opencode.jsonc` support, which is a separate, already-Phase-2 feature
+  (`ARCHITECTURE.md` §8, native precedence) gated on real bootstrap wiring, not on any test model.
+- A WS/SSE E2E test that sends a prompt immediately after opening/subscribing a WebSocket can race a
+  fast, real model (e.g. `opencode/big-pickle`) that completes and broadcasts before the socket has
+  actually finished subscribing server-side — `subscribe` (over WS) and the prompt (a separate HTTP
+  connection) have no cross-connection ordering guarantee, and this phase's WS subset has no
+  `fetch_history` replay (deferred to Phase 6 by design), so a missed frame is gone for good, not
+  just delayed. Fix: only send the prompt from a callback fired after `subscribe` is actually sent,
+  plus a small settle delay (e.g. 500ms) — trivial for a human using the dashboard, but necessary for
+  an automated test racing a fast model.
+- `control-plane/src/routes/internal.js`'s `broadcastToSession(id, {type: 'event', ...req.body})`
+  does not actually produce a `{type: 'event', ...}` wrapper on the wire: since `req.body` (opencode's
+  own native event) already carries its own `type` field, the object spread **overwrites** the
+  wrapper's literal `'event'` with that inner type. Any WS consumer/test that checks for the literal
+  string `'event'` will silently never match — check for the real event's own `type` value directly
+  (e.g. `message.part.updated`) instead, using `properties !== undefined` (or similar) as the
+  discriminator against `ping`/`prompt-result` frames if needed. Not a functional bug in the shipped
+  dashboard hook (`useSessionSocket.ts` only ever filters out `pong`), but a real quirk worth knowing
+  before writing any new WS consumer/test.
+- When running an isolated `docker compose` stack for verification (`-p <name>`, per the host-port
+  isolation pattern already documented above), also override the service's `SANDBOX_NETWORK` env var
+  to the isolated project's own network name — `docker-compose.yml`'s `egress-net` is a fixed,
+  non-project-prefixed name (`networks.egress-net.name: egress-net`), so an isolated stack's
+  `sandbox.js`-spawned containers otherwise silently join the *other*, already-running default
+  project's `egress-net` (that name already exists docker-wide) instead of the isolated one — the
+  spawned sandbox container itself comes up healthy, but the isolated control-plane can never reach
+  it (cross-network DNS failure manifests as a generic `SANDBOX_UNAVAILABLE`/503, easily
+  misdiagnosed as a spawn failure rather than a network-isolation mistake).
+- Step 00601 (closed) wired `bootstrapWorkspace()` into `spawnSandbox()` and its own unit tests
+  correctly cover the new call, but its Action 7 checklist ("re-run `make build/e2e/lint/test/loc`
+  and confirm green") was not actually all green at closure time: `pnpm exec biome check .`
+  (the read-only gate CI's `checks` job runs, not `pnpm run lint`'s auto-fixing local wrapper)
+  failed on the exact file the step modified (`sessions.js`), and `make loc` was over budget
+  (1005/1000) with `sessions.js` now the single largest file. A step's own "confirm green" claim
+  for a checklist of shell commands must be backed by literally re-running each command and
+  reading its exit code/output — never inferred from the diff "looking clean" or from having run
+  `pnpm run lint` (which silently reformats instead of failing).
+- Step 00601's `bootstrapWorkspace()` wiring (closed) also silently broke `control-plane/Dockerfile`:
+  it never installed `git` (only `docker.io`), so every real bootstrap attempt inside the
+  `control-plane` container failed instantly with `spawn git ENOENT` — invisible in 00601's own unit
+  tests (which mock `spawn`) and never caught because its own `make e2e` checklist item wasn't
+  actually re-run (see the bullet above). Once `git` is installed, the *next* failure is
+  `fatal: server certificate verification failed. CAfile: none CRLfile: none` — `node:24-slim` (via
+  `docker.io`'s dependency chain) does not pull in `ca-certificates`, so `git`'s HTTPS clones can
+  never verify GitHub's cert either; both packages (`git ca-certificates`) are required together.
+  Separately (still open, out of scope for step 00602): `e2e/tests/session-lifecycle.spec.ts` hardcodes
+  a placeholder `repoOwner: 'acme', repoName: 'widgets'` that was never a real, clonable GitHub repo —
+  harmless before 00601 (bootstrap was never actually called, so the fake repo was never dereferenced),
+  but now that bootstrap is wired for real, every happy-path session request in that spec fails at the
+  git-clone step (`could not read Username for 'https://github.com'` — GitHub's real API returning 401
+  for a private/nonexistent repo, not a 404) before ever reaching model resolution. Fixing this
+  requires either pointing the spec at a real, public, always-clonable fixture repo or providing a
+  real credential — out of scope for a stub-model-retirement step; needs its own follow-up gap step.
+  Follow-up gap step created: `docs/plan/steps/planned/00606-...md`, tracking the current, live
+  reproduction (2 of the 6 tests that ran in an isolated `make e2e` failed with
+  `pending_bootstrap-failed` for exactly this reason) — this confirms step `00602`'s own Action 5
+  ("confirm `make e2e` still passes") was not actually true at review time, even though the root
+  cause is step `00601`'s, not `00602`'s own changes.
+- 2026-08-13: `control-plane/src/config.js`'s `PLATFORM_CONFIG_REPO` default
+  (`https://github.com/tbrandenburg/agent-control-plane.git`) is a **private** repo — every real
+  `bootstrapWorkspace()` call (any session, any target repo, any environment without host git
+  credentials) fails at the platform-repo-clone step with `fatal: could not read Username for
+  'https://github.com'`, reproduced live with a standalone `docker run --rm --network egress-net
+  agent-control-plane:local git clone ...` against the exact same URL. It only ever appeared to work
+  on a dev machine that already has `gh auth login`-managed git credentials in its global credential
+  store — that store is never available inside the container (no such mount in
+  `docker-compose.yml`), so this is not a fluke: no `PLATFORM_CONFIG_REPO` override exists anywhere
+  in the repo's `.yml`/`.env` files. Before trusting any "make e2e passes"/"bootstrap works" claim
+  that depends on the *default* platform-config repo, verify the default URL is actually a public,
+  credential-less-clonable repo — a private/inaccessible default silently makes every dev-machine
+  run "work" (host credentials leak through the shell used to invoke `make e2e`, if run outside an
+  isolated container) while failing deterministically in any real CI/isolated-container run. Tracked
+   in `docs/plan/steps/planned/00607-...md`.
+- 2026-08-13: `scripts/loc.mjs`'s LOC gate counts authored lines repo-wide, regardless of which file
+  they live in — extracting a function into a new, better-organized module (e.g. splitting
+  `sessions.js`'s bootstrap/spawn orchestration into `spawn-session.js`) does not by itself reduce the
+  `TOTAL` in `make loc`, since the same authored lines are just relocated (plus a small per-file
+  import/header overhead). When a real, non-removable functionality addition (e.g. step `00601`'s
+  `bootstrapWorkspace()` wiring) pushes the total over the ceiling, modularize first for organization,
+  but expect to also need `scripts/loc.mjs`'s `CEILING` constant raised (with a rationale comment) if
+  the growth is genuinely justified — don't assume a refactor alone will bring a ~1000-line total back
+  under budget. `scripts/loc.mjs`'s two `COMPONENTS` rows named `Bootstrap` and `Prompt/stop delivery`
+  already existed with empty `globs: []` (matching `docs/ARCHITECTURE.md` §14's table) before any file
+  was assigned to them — check for an already-reserved-but-empty row matching new code's purpose
+  before inventing a new row.
+- 2026-08-13: `control-plane/src/config.js`'s `PLATFORM_CONFIG_REPO` default was
+  `tbrandenburg/agent-control-plane`, a **private** GitHub repo — since `bootstrapWorkspace()` clones
+  it unconditionally for every session and no `.yml`/`.env` file anywhere overrode it, every real,
+  credential-less bootstrap (any CI/isolated-container run) failed at the platform-repo-clone step
+  regardless of target repo (fixed in step `00700` by switching the default to
+  `octocat/Hello-World`, a real public, always-clonable repo — content is irrelevant per this doc's
+  own Option C decision, only unconditional clonability matters). Once that was fixed, a second,
+  previously-masked bug surfaced in `e2e/tests/arbitrary-repo-bootstrap.spec.ts` (every session had
+  failed bootstrap before ever reaching this assertion): it hardcoded `/workspace/repo/README.md`
+  for both target-repo fixtures, but `octocat/Hello-World` actually ships a plain `README` (no
+  extension) — only `octocat/Spoon-Knife` ships `README.md`. A green step closure that never
+  actually got a session past `pending_bootstrap` can hide arbitrarily many downstream assertion
+  bugs; fixing an upstream blocker can immediately surface them.
 

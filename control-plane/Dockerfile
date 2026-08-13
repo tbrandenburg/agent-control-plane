@@ -11,7 +11,13 @@ RUN corepack enable
 # as root (see the dropped `USER node` below) purely so it can read that host socket without
 # fragile host-GID matching — deliberately insecure this phase, same "single flag to flip" pattern
 # as every other PHASE-4 item in ARCHITECTURE.md §12.
-RUN apt-get update && apt-get install -y --no-install-recommends docker.io \
+# `git` so `control-plane/src/bootstrap.js` (`spawn('git', ...)`) can clone/checkout per-session
+# target repos — required since step 00601 wired real bootstrap into the spawn path; `docker.io`
+# alone does not pull in `git` as a dependency. `ca-certificates` so those git clones over HTTPS
+# (e.g. github.com) can verify the remote's TLS certificate — without it every clone fails with
+# "server certificate verification failed. CAfile: none CRLfile: none" regardless of the target
+# repo actually existing.
+RUN apt-get update && apt-get install -y --no-install-recommends docker.io git ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -1,0 +1,18 @@
+
+> agent-control-plane@0.0.1 loc /home/tom/workspace/ai/made/workspace/agent-control-plane
+> node scripts/loc.mjs
+
+Component                 LOC
+Public API                394
+WS relay                    0
+Sandbox lifecycle         148
+Bootstrap                  57
+Prompt/stop delivery       33
+SQLite                     49
+Webhook                     0
+Reaper                      0
+Auth                        0
+Bridge                    269
+Proxy config glue           0
+Dashboard (server glue)    72
+TOTAL                     1022 / 1050  ✅

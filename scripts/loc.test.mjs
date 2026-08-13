@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 
 import {
+  CEILING,
   countFile,
   EXCLUDE_PATTERNS,
   expand,
@@ -105,13 +106,14 @@ test('CLI exits 0 and prints a passing total for the real repo tree', () => {
     cwd: new URL('..', import.meta.url).pathname,
     encoding: 'utf8',
   });
-  assert.match(output, /TOTAL\s+\d+\s+\/\s+1000\s+✅/);
+  assert.match(output, new RegExp(`TOTAL\\s+\\d+\\s+/\\s+${CEILING}\\s+✅`));
 });
 
 test('CLI exits 1 when a synthetic total exceeds the ceiling', () => {
+  const overCeiling = CEILING + 1;
   const bigFile = join(dir, 'over-ceiling.js');
   const lines = Array.from(
-    { length: 1001 },
+    { length: overCeiling },
     (_, i) => `const line${i} = ${i};`,
   ).join('\n');
   writeFileSync(bigFile, lines);
@@ -129,7 +131,10 @@ test('CLI exits 1 when a synthetic total exceeds the ceiling', () => {
     () => execFileSync('node', [harness], { encoding: 'utf8' }),
     (error) => {
       assert.equal(error.status, 1);
-      assert.match(error.stdout, /TOTAL\s+1001\s+\/\s+1000\s+❌/);
+      assert.match(
+        error.stdout,
+        new RegExp(`TOTAL\\s+${overCeiling}\\s+/\\s+${CEILING}\\s+❌`),
+      );
       return true;
     },
   );
