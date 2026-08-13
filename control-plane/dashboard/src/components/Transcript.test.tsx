@@ -40,10 +40,13 @@ describe('Transcript', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 
-  it('shows a reload message on an invalid wsToken, not a silent disconnect', () => {
+  it('shows an accurate message on an invalid wsToken, not a silent disconnect', () => {
     render(<Transcript events={[]} status="closed" invalidToken={true} />);
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/reload/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /live updates aren't available/i,
+    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent(/reload/i);
   });
 
   it('shows a reconnecting message while status is reconnecting', () => {

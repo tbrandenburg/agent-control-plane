@@ -86,7 +86,10 @@ export function Transcript({
     <div>
       {invalidToken && (
         <p role="alert" className="mb-2 text-xs text-red-600">
-          Session token invalid, reload the page to reconnect.
+          Live updates aren't available in this browser tab (no valid session
+          token found here). You can still view session details — return to the
+          sessions list or reopen this session from the tab where it was
+          created.
         </p>
       )}
       {!invalidToken && status === 'reconnecting' && (
