@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createSession, stopSession } from './client';
+import { createSession, fetchSessions, stopSession } from './client';
 
 function jsonResponse(body: unknown, status = 200) {
   return Promise.resolve(new Response(JSON.stringify(body), { status }));
@@ -43,5 +43,32 @@ describe('client request()', () => {
     expect((init.headers as Record<string, string>)['content-type']).toBe(
       'application/json',
     );
+  });
+});
+
+describe('fetchSessions()', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('calls /api/sessions with no query string when no params are given', async () => {
+    const fetchMock = vi.fn(() => jsonResponse({ sessions: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchSessions();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/sessions', expect.anything());
+  });
+
+  it('builds a query string from status/limit/offset params', async () => {
+    const fetchMock = vi.fn(() => jsonResponse({ sessions: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchSessions({ status: 'active', limit: 20, offset: 40 });
+
+    const [url] = fetchMock.mock.calls[0] as unknown as [string];
+    expect(url).toContain('status=active');
+    expect(url).toContain('limit=20');
+    expect(url).toContain('offset=40');
   });
 });
