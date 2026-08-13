@@ -648,8 +648,8 @@ describe('POST /api/sessions/:id/stop', () => {
     await app.close();
   });
 
-  it('proxies to sandbox.stop() and reports which path stopped it', async () => {
-    vi.mocked(sandbox.stop).mockResolvedValue({ method: 'bridge' });
+  it('proxies to sandbox.stop(), reports which path stopped it, and clears container_name', async () => {
+    vi.mocked(sandbox.stop).mockResolvedValue({ method: 'docker' });
     const app = buildServer();
     seedSession(getDb(app), { id: 'sess-1', container_name: 'sandbox-1' });
     await app.ready();
@@ -660,12 +660,17 @@ describe('POST /api/sessions/:id/stop', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ status: 'stopped', method: 'bridge' });
+    expect(response.json()).toEqual({ status: 'stopped', method: 'docker' });
     expect(sandbox.stop).toHaveBeenCalledWith('sandbox-1');
+
+    const row = getDb(app)
+      .prepare('SELECT container_name FROM sessions WHERE id = ?')
+      .get('sess-1');
+    expect(row.container_name).toBeNull();
     await app.close();
   });
 
-  it('returns 502 when both the bridge proxy and the docker stop fallback fail', async () => {
+  it('returns 502 and leaves container_name untouched when sandbox.stop() fails', async () => {
     vi.mocked(sandbox.stop).mockRejectedValue(
       new Error('docker: no such container'),
     );
@@ -680,6 +685,11 @@ describe('POST /api/sessions/:id/stop', () => {
 
     expect(response.statusCode).toBe(502);
     expect(response.json()).toEqual({ error: 'docker: no such container' });
+
+    const row = getDb(app)
+      .prepare('SELECT container_name FROM sessions WHERE id = ?')
+      .get('sess-1');
+    expect(row.container_name).toBe('sandbox-1');
     await app.close();
   });
 });

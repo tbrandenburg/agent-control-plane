@@ -539,9 +539,14 @@ straight into the bridge's own small HTTP server, reachable because the control 
 poll loop** — this was the single most valuable simplification found during design: once the control
 plane can reach the bridge directly, having the bridge poll for work is unnecessary machinery.
 
-`stop` specifically: the control plane calls the bridge's `POST /stop` directly; the bridge calls
-OpenCode's native `abort`; the control plane falls back to `docker stop` only on a timeout waiting for
-the bridge's response.
+`stop` specifically (GitHub issue #10 correction): the control plane makes a best-effort, bounded-
+timeout call to the bridge's `POST /stop` (which calls OpenCode's native `abort`, aborting any
+in-flight prompt), then *unconditionally* also runs a real `docker stop` + `docker rm` — the
+bridge call's outcome (success, error, or timeout) never gates the actual stop, so a healthy
+bridge responding `ok` no longer gets mistaken for the container having actually been terminated.
+The stop route also clears the session row's `container_name` on success; `sessions.status` itself
+is left untouched, since the derived `running`/`stopped`/`failed` values are never persisted
+(§1) — they're computed client-side from the live `docker inspect` phase.
 
 The OpenCode **event relay** direction (bridge → control plane) is unaffected by this — it was always
 a push, never had a poll/ack problem.
