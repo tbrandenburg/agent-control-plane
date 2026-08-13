@@ -163,8 +163,9 @@ describe('cloneAndCheckout (real git fetch/checkout)', () => {
     });
     execFileSync('git', ['config', 'user.name', 'Test'], { cwd: seed });
     mkdirSync(path.join(seed, '.opencode'), { recursive: true });
+    mkdirSync(path.join(seed, 'other'), { recursive: true });
     writeFileSync(path.join(seed, '.opencode', 'config.json'), '{}');
-    writeFileSync(path.join(seed, 'other.txt'), 'x');
+    writeFileSync(path.join(seed, 'other', 'other.txt'), 'x');
     execFileSync('git', ['add', '.'], { cwd: seed });
     execFileSync('git', ['commit', '-q', '-m', 'seed'], { cwd: seed });
     execFileSync('git', ['push', '-q', 'origin', 'HEAD:main'], { cwd: seed });
@@ -177,7 +178,7 @@ describe('cloneAndCheckout (real git fetch/checkout)', () => {
 
     const entries = readdirSync(dest);
     expect(entries).toContain('.opencode');
-    expect(entries).not.toContain('other.txt');
+    expect(entries).not.toContain('other');
   });
 
   it('throws classified not_found for a real nonexistent GitHub repo (fetch call site)', async () => {
