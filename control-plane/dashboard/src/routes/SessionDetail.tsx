@@ -50,7 +50,13 @@ export function SessionDetail({ id }: { id: string }) {
   const stopSession = useStopSession(id);
   const archiveSession = useArchiveSession(id);
   const wsToken = getStoredWsToken(id);
-  const { events, status, invalidToken } = useSessionSocket(id, wsToken);
+  const shouldConnect =
+    session?.status === 'active' || session?.status === 'pending_bootstrap';
+  const { events, status, invalidToken } = useSessionSocket(
+    id,
+    wsToken,
+    shouldConnect,
+  );
 
   if (isLoading)
     return <p className="text-sm text-muted-foreground">Loading…</p>;

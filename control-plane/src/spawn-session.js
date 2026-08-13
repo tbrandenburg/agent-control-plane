@@ -12,6 +12,7 @@
 import * as defaultBootstrap from './bootstrap.js';
 import { loadConfig } from './config.js';
 import * as defaultSandbox from './sandbox.js';
+import { isValidTransition } from './session-state.js';
 
 /**
  * Ref resolved for every bootstrapped repo (target/platform/team) — `HEAD` rather than a
@@ -27,6 +28,31 @@ const DEFAULT_REF = 'HEAD';
  */
 function githubUrl(path) {
   return `https://github.com/${path}.git`;
+}
+
+/**
+ * Updates `sessions.status`, but only if the row's current status allows that transition
+ * (issue #28) — defensive, since both callers below only ever run from `pending_bootstrap`.
+ * @param {import('node:sqlite').DatabaseSync} db - Open database handle.
+ * @param {string} id - Session id.
+ * @param {string} nextStatus - Target status.
+ * @param {string} [containerName] - Container name to persist alongside an `active` transition.
+ * @returns {void}
+ */
+function transitionStatus(db, id, nextStatus, containerName) {
+  const row = /** @type {{status: string}|undefined} */ (
+    db.prepare('SELECT status FROM sessions WHERE id = ?').get(id)
+  );
+  if (!row || !isValidTransition(row.status, nextStatus)) return;
+  const sql =
+    containerName !== undefined
+      ? "UPDATE sessions SET container_name = ?, status = ?, updated_at = datetime('now') WHERE id = ?"
+      : "UPDATE sessions SET status = ?, updated_at = datetime('now') WHERE id = ?";
+  const params =
+    containerName !== undefined
+      ? [containerName, nextStatus, id]
+      : [nextStatus, id];
+  db.prepare(sql).run(...params);
 }
 
 /**
@@ -76,16 +102,12 @@ export async function spawnSandbox(
       teamConfigDir: layout.teamConfigDir,
     });
     await sandbox.waitForHealth(started.containerName);
-    db.prepare(
-      "UPDATE sessions SET container_name = ?, status = 'active', updated_at = datetime('now') WHERE id = ?",
-    ).run(started.containerName, id);
+    transitionStatus(db, id, 'active', started.containerName);
   } catch (err) {
     console.error(
       `session ${id} bootstrap/spawn failed:`,
       err instanceof Error ? err.message : String(err),
     );
-    db.prepare(
-      "UPDATE sessions SET status = 'pending_bootstrap-failed', updated_at = datetime('now') WHERE id = ?",
-    ).run(id);
+    transitionStatus(db, id, 'pending_bootstrap-failed');
   }
 }

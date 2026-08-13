@@ -233,4 +233,23 @@ describe('SessionDetail — archived composer', () => {
       screen.queryByText(/this session is archived/i),
     ).not.toBeInTheDocument();
   });
+
+  it('never opens a WebSocket for an archived session', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
+      if (String(url).includes('/api/models'))
+        return jsonResponse({ models: [] });
+      return jsonResponse({ ...SESSION_BODY, status: 'archived' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    storeWsToken('s1', 'tok-1');
+    renderSessionDetail('s1');
+
+    await waitFor(() =>
+      expect(screen.getByText(/this session is archived/i)).toBeInTheDocument(),
+    );
+
+    expect(FakeWebSocket.instances).toHaveLength(0);
+  });
 });

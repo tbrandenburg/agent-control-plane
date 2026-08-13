@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildServer } from '../server.js';
-import { broadcastToSession } from './ws.js';
+import { broadcastToSession, closeSubscribersForSession } from './ws.js';
 
 /** @type {string} */
 let dataDir;
@@ -211,5 +211,53 @@ describe('WebSocket subset', () => {
     await closed;
     // A subsequent broadcast to the now-empty session must not throw and must be a no-op.
     expect(() => broadcastToSession(id, { type: 'event' })).not.toThrow();
+  });
+
+  it('closes with code 4002 when subscribing to an archived session', async () => {
+    const id = seedSession(app.db, { status: 'archived' });
+    const socket = await connect(id);
+    const closed = nextClose(socket);
+    socket.send(
+      JSON.stringify({ type: 'subscribe', wsToken: 'correct-token' }),
+    );
+
+    expect(await closed).toBe(4002);
+  });
+
+  it('closes with code 4002 when subscribing to a pending_bootstrap-failed session', async () => {
+    const id = seedSession(app.db, { status: 'pending_bootstrap-failed' });
+    const socket = await connect(id);
+    const closed = nextClose(socket);
+    socket.send(
+      JSON.stringify({ type: 'subscribe', wsToken: 'correct-token' }),
+    );
+
+    expect(await closed).toBe(4002);
+  });
+
+  it('closeSubscribersForSession closes every currently-subscribed socket with the given code', async () => {
+    const id = seedSession(app.db);
+    const socketA = await connect(id);
+    const socketB = await connect(id);
+    socketA.send(
+      JSON.stringify({ type: 'subscribe', wsToken: 'correct-token' }),
+    );
+    socketB.send(
+      JSON.stringify({ type: 'subscribe', wsToken: 'correct-token' }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const closedA = nextClose(socketA);
+    const closedB = nextClose(socketB);
+    closeSubscribersForSession(id, 4002);
+
+    expect(await closedA).toBe(4002);
+    expect(await closedB).toBe(4002);
+  });
+
+  it('closeSubscribersForSession is a no-op when no sockets are subscribed', () => {
+    expect(() =>
+      closeSubscribersForSession('no-such-session', 4002),
+    ).not.toThrow();
   });
 });

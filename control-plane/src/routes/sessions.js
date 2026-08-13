@@ -18,7 +18,9 @@ import {
 } from '../model.js';
 import { promptSession } from '../prompt-session.js';
 import * as defaultSandbox from '../sandbox.js';
+import { isValidTransition } from '../session-state.js';
 import { spawnSandbox } from '../spawn-session.js';
+import { CLOSE_SESSION_ARCHIVED, closeSubscribersForSession } from './ws.js';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
@@ -387,10 +389,17 @@ export function registerSessionsRoutes(
       return { error: 'INVALID_STATUS' };
     }
 
-    const exists = db.prepare('SELECT 1 FROM sessions WHERE id = ?').get(id);
-    if (!exists) {
+    const currentRow = /** @type {{status: string}|undefined} */ (
+      db.prepare('SELECT status FROM sessions WHERE id = ?').get(id)
+    );
+    if (!currentRow) {
       reply.code(404);
       return { error: 'SESSION_NOT_FOUND' };
+    }
+
+    if (!isValidTransition(currentRow.status, status)) {
+      reply.code(409);
+      return { error: 'INVALID_TRANSITION' };
     }
 
     // Archive implies teardown: tear down the live container (if any) so archiving a
@@ -419,6 +428,10 @@ export function registerSessionsRoutes(
     db.prepare(
       "UPDATE sessions SET status = ?, updated_at = datetime('now') WHERE id = ?",
     ).run(status, id);
+
+    if (status === 'archived') {
+      closeSubscribersForSession(id, CLOSE_SESSION_ARCHIVED);
+    }
 
     const row = /** @type {SessionRow} */ (
       db.prepare('SELECT * FROM sessions WHERE id = ?').get(id)

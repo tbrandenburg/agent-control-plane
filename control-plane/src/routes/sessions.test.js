@@ -81,12 +81,13 @@ function seedSession(db, overrides = {}) {
     status: 'active',
     container_name: null,
     opencode_session_id: null,
+    ws_token: null,
     ...overrides,
   };
   db.prepare(
     `INSERT INTO sessions
-      (id, title, repo_owner, repo_name, model, reasoning_effort, status, container_name, opencode_session_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (id, title, repo_owner, repo_name, model, reasoning_effort, status, container_name, opencode_session_id, ws_token)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     row.id,
     row.title,
@@ -97,6 +98,7 @@ function seedSession(db, overrides = {}) {
     row.status,
     row.container_name,
     row.opencode_session_id,
+    row.ws_token,
   );
   return row.id;
 }
@@ -801,7 +803,7 @@ describe('PATCH /api/sessions/:id', () => {
     await app.close();
   });
 
-  it('transitions archived -> active', async () => {
+  it('rejects archived -> active with 409 INVALID_TRANSITION (archived is terminal)', async () => {
     const app = buildServer();
     seedSession(getDb(app), { id: 'sess-1', status: 'archived' });
     await app.ready();
@@ -812,9 +814,86 @@ describe('PATCH /api/sessions/:id', () => {
       payload: { status: 'active' },
     });
 
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ error: 'INVALID_TRANSITION' });
+    expect(sandbox.stop).not.toHaveBeenCalled();
+
+    const row = getDb(app)
+      .prepare('SELECT status FROM sessions WHERE id = ?')
+      .get('sess-1');
+    expect(row?.status).toBe('archived');
+    await app.close();
+  });
+
+  it('transitions pending_bootstrap -> active', async () => {
+    const app = buildServer();
+    seedSession(getDb(app), { id: 'sess-1', status: 'pending_bootstrap' });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/sessions/sess-1',
+      payload: { status: 'active' },
+    });
+
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ id: 'sess-1', status: 'active' });
-    expect(sandbox.stop).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('rejects pending_bootstrap-failed -> active with 409 INVALID_TRANSITION', async () => {
+    const app = buildServer();
+    seedSession(getDb(app), {
+      id: 'sess-1',
+      status: 'pending_bootstrap-failed',
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/sessions/sess-1',
+      payload: { status: 'active' },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ error: 'INVALID_TRANSITION' });
+    await app.close();
+  });
+
+  it('archiving a session already subscribed over WS closes the socket with code 4002', async () => {
+    const app = buildServer();
+    seedSession(getDb(app), {
+      id: 'sess-1',
+      status: 'active',
+      ws_token: 'tok-1',
+    });
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const address = app.server.address();
+
+    const socket = await new Promise((resolve, reject) => {
+      const s = new WebSocket(
+        `ws://127.0.0.1:${address.port}/ws/sessions/sess-1`,
+      );
+      s.addEventListener('open', () => resolve(s));
+      s.addEventListener('error', reject);
+    });
+    socket.send(JSON.stringify({ type: 'subscribe', wsToken: 'tok-1' }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const closed = new Promise((resolve) => {
+      socket.addEventListener('close', (ev) => resolve(ev.code), {
+        once: true,
+      });
+    });
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/sessions/sess-1',
+      payload: { status: 'archived' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(await closed).toBe(4002);
     await app.close();
   });
 
