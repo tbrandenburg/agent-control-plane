@@ -5,8 +5,8 @@ Evidence gathered by running `e2e/tests/session-lifecycle.spec.ts` against the r
 and direct SQL against `data/control-plane.db`. Per root `AGENTS.md`'s evidence-first principle,
 this document — not a green test run alone — is Phase 1's exit artifact.
 
-> **Environment note:** no real LiteLLM deployment/credentials were available in this run's
-> environment (no `LITELLM_BASE_URL`/`LITELLM_API_KEY`, no `.env`, nothing in CI secrets either).
+> **Environment note:** no real model gateway deployment/credentials were available in this run's
+> environment (no `MODEL_GATEWAY_BASE_URL`/`MODEL_GATEWAY_API_KEY`, no `.env`, nothing in CI secrets either).
 > `e2e/fixtures/stub-model-server.mjs` — a small OpenAI-Chat-Completions-compatible HTTP server —
 > now stands in as the model backend by default in `docker-compose.yml` (overridable). Everything
 > about Docker, `opencode serve`, and the bridge/SSE relay below is the real thing; only the
@@ -57,9 +57,9 @@ or `control-plane/src/routes/sessions.js`.
 Two real leaks were found and fixed as part of building this E2E spec (both in code this step
 owns/depends on, not in the seam's own contract):
 
-- **Custom `provider.litellm` config was missing its own `models` map.** `@ai-sdk/openai-compatible`
+- **Custom `provider.<gateway>` config was missing its own `models` map.** `@ai-sdk/openai-compatible`
   (and every custom, `npm`-based opencode provider) only exposes models explicitly declared under
-  `provider.<id>.models` — omitting it fails every prompt with `Model not found: litellm/<model>`,
+  `provider.<id>.models` — omitting it fails every prompt with `Model not found: opencode/<model>`,
   even though `baseURL`/`apiKey` were correct. Fixed in `control-plane/src/sandbox.js`'s
   `buildOpencodeConfig` — the session's own model id is now always registered.
 - **`WORKSPACE_HOST_PATH`'s documented default (`./workspace`) is not a valid Docker bind-mount
@@ -126,11 +126,11 @@ exit criterion — "you click New Session in a browser, type a prompt, and watch
 met at the API/bridge layer with real evidence; the dashboard's own consumption of `message.part.delta`
 is the one open item noted above.
 
-## Post-close scope correction: model gateway was over-specified to LiteLLM
+## Post-close scope correction: model gateway was over-specified to a single named gateway
 
 Found during customer review after this phase closed, not during original implementation.
 `control-plane/src/sandbox.js`'s `OPENCODE_CONFIG_CONTENT` composition and `docker-compose.yml`'s
-`LITELLM_BASE_URL`/`LITELLM_API_KEY` env vars hardcode a single named gateway, contradicting
+`MODEL_GATEWAY_BASE_URL`/`MODEL_GATEWAY_API_KEY` env vars hardcode a single named gateway, contradicting
 `docs/archive/ai-coding-agent-doc.md`'s own "OpenCode config layering" chapter: the full provider
 catalog belongs in the Platform config repo's `opencode.json` (opencode's native config layering),
 not in control-plane-injected config — `model` is already `providerID/modelID` precisely so any
@@ -154,13 +154,13 @@ including this project's own dev/e2e stack). No option was silently chosen — r
 decision in [GitHub issue #1](https://github.com/tbrandenburg/agent-control-plane/issues/1) for
 whoever implements Phase 2.
 
-## Addendum (2026-08-13, Phase 2 Step 00602): `litellm/stub-model` reproduction path no longer resolves standalone
+## Addendum (2026-08-13, Phase 2 Step 00602): `opencode/big-pickle` reproduction path no longer resolves standalone
 
 Since Phase 2 Step `00200`'s Option C decision (`OPENCODE_CONFIG_CONTENT` now composes only
-`{model, autoupdate}`, no default provider block injected), the `litellm/stub-model` reproduction
+`{model, autoupdate}`, no default provider block injected), the `opencode/big-pickle` reproduction
 path this document describes above no longer resolves on its own — a real prompt against
-`litellm/stub-model` now fails with `ProviderModelNotFoundError: Model not found:
-litellm/stub-model` (`docs/phase_02_findings.md` §2), since no default `provider.litellm` block is
+`opencode/big-pickle` now fails with `ProviderModelNotFoundError: Model not found:
+opencode/big-pickle` (`docs/phase_02_findings.md` §2), since no default `provider.<gateway>` block is
 injected and no real Platform config repo is cloned to supply one (tracked separately in step
 `00601`). The evidence above (e.g. the missing `models` map bug) remains historically accurate for
 the code state it describes, but is no longer reproducible standalone with the current stack.
@@ -168,6 +168,6 @@ the code state it describes, but is no longer reproducible standalone with the c
 `docker-compose.yml`/`make e2e` (Step `00602`) now default to `opencode/big-pickle`, a real, free,
 zero-credential model bundled natively with opencode, as their E2E fixture — this is a fixture
 choice only, not a production model-selection decision (see step `00602`'s own scope-caution note).
-Anyone needing to exercise a real `litellm/*`-style provider block should instead pair a real
+Anyone needing to exercise a real gateway-routed provider block should instead pair a real
 Platform config repo fixture (step `00601`) with a correct `provider.<id>.models` map, not this
 retired `stub-model` path.

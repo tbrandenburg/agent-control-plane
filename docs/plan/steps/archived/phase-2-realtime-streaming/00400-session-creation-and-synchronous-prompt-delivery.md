@@ -34,7 +34,7 @@ to the bridge's `POST /prompt`. Return the bridge's ack. No queue, no ack table,
 is Phase 3; a dead sandbox is a plain error this phase.
 
 ##### `GET /api/models` and validation
-Return `{ models: MODEL_ALLOWLIST }` from `config.js` — static, hand-curated, no LiteLLM query, no cache
+Return `{ models: MODEL_ALLOWLIST }` from `config.js` — static, hand-curated, no live gateway query, no cache
 ([§5](./ARCHITECTURE.md)). Validation is **syntax only**: non-empty `provider` and `model` around the
 first `/`, else `400 INVALID_MODEL_REFERENCE`. **Do not check allowlist membership** — [§5](./ARCHITECTURE.md)
 states this explicitly as a confirmed production behaviour and warns against adding a stricter gate.
@@ -75,8 +75,8 @@ Covered in Step 6.
 Create → prompt → events flow with a stubbed sandbox module; the 404/503 paths; `GET /api/models` shape.
 
 ##### Unit
-Model syntax validation table: `litellm/x` valid, `x` invalid, `/x` invalid, `x/` invalid,
-`litellm/a/b` valid with `modelID = "a/b"`, and a non-allowlisted but well-formed id **accepted**.
+Model syntax validation table: `opencode/x` valid, `x` invalid, `/x` invalid, `x/` invalid,
+`opencode/a/b` valid with `modelID = "a/b"`, and a non-allowlisted but well-formed id **accepted**.
 
 #### Validation
 

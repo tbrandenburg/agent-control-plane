@@ -137,13 +137,19 @@ export function SessionDetail({ id }: { id: string }) {
               {sendPrompt.error.message}
             </p>
           )}
-          <PromptComposer
-            models={modelsData?.models ?? []}
-            defaultModel={session.model ?? undefined}
-            defaultReasoningEffort={session.reasoningEffort ?? undefined}
-            disabled={sendPrompt.isPending}
-            onSubmit={(input) => sendPrompt.mutateAsync(input)}
-          />
+          {archived ? (
+            <p className="text-sm text-muted-foreground">
+              This session is archived. Create a new session to continue.
+            </p>
+          ) : (
+            <PromptComposer
+              models={modelsData?.models ?? []}
+              defaultModel={session.model ?? undefined}
+              defaultReasoningEffort={session.reasoningEffort ?? undefined}
+              disabled={sendPrompt.isPending}
+              onSubmit={(input) => sendPrompt.mutateAsync(input)}
+            />
+          )}
         </div>
 
         <aside className="rounded-md border p-4 text-sm">

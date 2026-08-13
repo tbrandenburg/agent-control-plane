@@ -34,6 +34,10 @@ type Role = 'user' | 'assistant';
  * - `message.part.delta` carries only an *incremental* text chunk at
  *   `properties.{messageID,partID,delta}` — there is no `properties.part` on this frame type at
  *   all, so it must be handled as its own distinct shape, not folded into the `part.text` case.
+ * - `session.error` carries a discriminated error union at `properties.error`, matching
+ *   opencode SDK's `EventSessionError` type (`@opencode-ai/sdk`'s `types.gen.d.ts`): always a
+ *   `{ name, data: { message?: string, ... } }` shape (e.g. `ProviderAuthError`, `UnknownError`,
+ *   `MessageAbortedError`, `ApiError`) — never a bare top-level `message` field.
  */
 interface ParsedFrame {
   type?: string;
@@ -43,6 +47,7 @@ interface ParsedFrame {
     messageID?: string;
     partID?: string;
     delta?: string;
+    error?: { name?: string; message?: string; data?: { message?: string } };
   };
 }
 
@@ -57,6 +62,12 @@ interface RawEntry {
   key: string;
   timestamp: string;
   type: string;
+}
+
+interface ErrorEntry {
+  key: string;
+  timestamp: string;
+  message: string;
 }
 
 function parsePayload(payload: string): ParsedFrame | null {
@@ -78,6 +89,7 @@ function parsePayload(payload: string): ParsedFrame | null {
 function toEntries(events: EventRecord[]): {
   messages: MessageEntry[];
   raw: RawEntry[];
+  errors: ErrorEntry[];
 } {
   const roleByMessage = new Map<string, Role>();
   const messageByPart = new Map<string, string>();
@@ -93,6 +105,7 @@ function toEntries(events: EventRecord[]): {
   const messages: MessageEntry[] = [];
   const groupIndex = new Map<string, number>();
   const raw: RawEntry[] = [];
+  const errors: ErrorEntry[] = [];
 
   const upsert = (groupId: string, text: string, timestamp: string) => {
     const existingIndex = groupIndex.get(groupId);
@@ -133,6 +146,21 @@ function toEntries(events: EventRecord[]): {
       }
     }
 
+    if (frame?.type === 'session.error') {
+      const error = frame.properties?.error;
+      const message =
+        error?.data?.message ??
+        error?.name ??
+        error?.message ??
+        'Unknown error';
+      errors.push({
+        key: String(event.id),
+        timestamp: event.timestamp,
+        message,
+      });
+      continue;
+    }
+
     raw.push({
       key: String(event.id),
       timestamp: event.timestamp,
@@ -140,7 +168,7 @@ function toEntries(events: EventRecord[]): {
     });
   }
 
-  return { messages, raw };
+  return { messages, raw, errors };
 }
 
 export function Transcript({
@@ -153,7 +181,7 @@ export function Transcript({
   invalidToken: boolean;
 }) {
   const [showRaw, setShowRaw] = useState(false);
-  const { messages, raw } = useMemo(() => toEntries(events), [events]);
+  const { messages, raw, errors } = useMemo(() => toEntries(events), [events]);
 
   return (
     <div>
@@ -169,6 +197,15 @@ export function Transcript({
         <p role="status" className="mb-2 text-xs text-amber-600">
           Reconnecting…
         </p>
+      )}
+      {errors.length > 0 && (
+        <ul className="mb-2 space-y-1" data-testid="transcript-errors">
+          {errors.map((entry) => (
+            <li key={entry.key} role="alert" className="text-sm text-red-600">
+              {entry.message}
+            </li>
+          ))}
+        </ul>
       )}
       {messages.length === 0 ? (
         <p className="text-sm text-muted-foreground">No events yet.</p>

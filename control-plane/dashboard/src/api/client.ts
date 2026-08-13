@@ -86,8 +86,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function fetchSessions(): Promise<{ sessions: Session[] }> {
-  return request('/api/sessions');
+export interface FetchSessionsParams {
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export function fetchSessions(
+  params?: FetchSessionsParams,
+): Promise<{ sessions: Session[] }> {
+  const search = new URLSearchParams();
+  if (params?.status) search.set('status', params.status);
+  if (params?.limit !== undefined) search.set('limit', String(params.limit));
+  if (params?.offset !== undefined) search.set('offset', String(params.offset));
+  const qs = search.toString();
+  return request(`/api/sessions${qs ? `?${qs}` : ''}`);
 }
 
 export function fetchSession(id: string): Promise<SessionDetail> {
@@ -141,11 +154,13 @@ export function getStoredWsToken(sessionId: string): string | null {
   return sessionStorage.getItem(`${WS_TOKEN_PREFIX}${sessionId}`);
 }
 
-export function useSessions(): UseQueryResult<
-  { sessions: Session[] },
-  ApiError
-> {
-  return useQuery({ queryKey: ['sessions'], queryFn: fetchSessions });
+export function useSessions(
+  params?: FetchSessionsParams,
+): UseQueryResult<{ sessions: Session[] }, ApiError> {
+  return useQuery({
+    queryKey: ['sessions', params ?? null],
+    queryFn: () => fetchSessions(params),
+  });
 }
 
 export function useSession(
