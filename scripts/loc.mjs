@@ -28,8 +28,16 @@ import { glob } from 'node:fs/promises';
  * handful of added test-fixture lines from other same-day issue fixes (#20/#21/#22/#23/#24,
  * see PR description). This is a genuine, non-removable behavior fix (permanent container-leak
  * bug), not bloat from a refactor or duplication — not trimmed further.
+ *
+ * Raised `1100` to `1150` (2026-08-13): implementing issue #28 (session lifecycle state machine
+ * enforced across DB/WS/UI) added a small new `control-plane/src/session-state.js` transition
+ * table plus validation call-sites in `routes/sessions.js`/`routes/ws.js`/`spawn-session.js`, and
+ * issue #27 (distinct `SANDBOX_STARTING` vs `SANDBOX_UNAVAILABLE` error code) added a few lines to
+ * `prompt-session.js`. Genuine, non-removable behavior additions (a real bug fix — sockets no
+ * longer linger "Connected" for archived sessions, invalid status transitions now rejected), not
+ * bloat from a refactor or duplication — not trimmed further.
  */
-const CEILING = 1100;
+const CEILING = 1150;
 
 /**
  * §14 component rows in display order. Each row's `globs` are matched relative to the repo root;
