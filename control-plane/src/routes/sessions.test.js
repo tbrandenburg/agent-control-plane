@@ -9,6 +9,7 @@ vi.mock('../sandbox.js', () => ({
   run: vi.fn(),
   waitForHealth: vi.fn(),
   stop: vi.fn(),
+  inspect: vi.fn(),
 }));
 
 vi.mock('../bootstrap.js', () => ({
@@ -42,6 +43,7 @@ beforeEach(() => {
   vi.mocked(sandbox.run).mockReset();
   vi.mocked(sandbox.waitForHealth).mockReset();
   vi.mocked(sandbox.stop).mockReset();
+  vi.mocked(sandbox.inspect).mockReset();
   vi.mocked(bootstrap.bootstrapWorkspace).mockReset();
   vi.mocked(bootstrap.bootstrapWorkspace).mockResolvedValue({
     targetDir: '/workspace/target',
@@ -199,9 +201,62 @@ describe('GET /api/sessions', () => {
 });
 
 describe('GET /api/sessions/:id', () => {
-  it('returns the session with a null phase', async () => {
+  it('returns a null phase when the session has no container', async () => {
     const app = buildServer();
-    seedSession(getDb(app));
+    seedSession(getDb(app), { container_name: null });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/sessions/sess-1',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ id: 'sess-1', phase: null });
+    expect(sandbox.inspect).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('returns the real docker inspect phase for a live container', async () => {
+    const app = buildServer();
+    seedSession(getDb(app), { container_name: 'sandbox-sess-1' });
+    vi.mocked(sandbox.inspect).mockResolvedValue({
+      exists: true,
+      state: 'running',
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/sessions/sess-1',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ id: 'sess-1', phase: 'running' });
+    expect(sandbox.inspect).toHaveBeenCalledWith('sandbox-sess-1');
+    await app.close();
+  });
+
+  it('returns a null phase when the container no longer exists', async () => {
+    const app = buildServer();
+    seedSession(getDb(app), { container_name: 'sandbox-sess-1' });
+    vi.mocked(sandbox.inspect).mockResolvedValue({ exists: false });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/sessions/sess-1',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ id: 'sess-1', phase: null });
+    await app.close();
+  });
+
+  it('falls back to a null phase when sandbox.inspect throws', async () => {
+    const app = buildServer();
+    seedSession(getDb(app), { container_name: 'sandbox-sess-1' });
+    vi.mocked(sandbox.inspect).mockRejectedValue(new Error('docker not found'));
     await app.ready();
 
     const response = await app.inject({
