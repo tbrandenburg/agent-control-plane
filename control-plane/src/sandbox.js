@@ -231,30 +231,39 @@ export async function waitForHealth(
 }
 
 /**
- * Stops a session's sandbox: a direct, bounded-timeout proxy call to the bridge's `POST /stop`
- * (which calls OpenCode's native `abort`, ARCHITECTURE.md §9), falling back to `docker stop` only
- * if the bridge doesn't respond in time — never on any other bridge error shape, so a genuinely
- * broken bridge doesn't mask itself as a clean stop.
+ * Stops a session's sandbox: best-effort, bounded-timeout call to the bridge's `POST /stop`
+ * (which calls OpenCode's native `abort`, aborting any in-flight prompt) followed
+ * *unconditionally* by a real `docker stop` + `docker rm` — the bridge call's outcome (success,
+ * error, or timeout) never gates the actual stop (GitHub issue #10: a healthy bridge responding
+ * `ok` used to be treated as "stopped" even though it never touched the container's lifecycle,
+ * so clicking Stop on a healthy session never actually terminated it).
  * @param {string} name - Container name.
  * @param {{fetchImpl?: typeof fetch, timeoutMs?: number}} [options] - Injectable fetch (tests) and
- *   the bridge-response timeout before falling back to `docker stop`.
- * @returns {Promise<{method: 'bridge'|'docker'}>} Which path actually stopped the sandbox.
- * @throws {Error} With trimmed `docker stop` stderr if both the bridge and the fallback fail.
+ *   the bounded timeout for the best-effort bridge abort.
+ * @returns {Promise<{method: 'docker'}>} Always `'docker'` — `docker stop`/`docker rm` is always
+ *   the path that actually stops the sandbox now.
+ * @throws {Error} With trimmed `docker stop` stderr if `docker stop` itself fails.
  */
 export async function stop(name, { fetchImpl = fetch, timeoutMs = 5000 } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetchImpl(`http://${name}:${DEFAULT_BRIDGE_PORT}/stop`, {
+    await fetchImpl(`http://${name}:${DEFAULT_BRIDGE_PORT}/stop`, {
       method: 'POST',
       signal: controller.signal,
     });
-    if (res.ok) return { method: 'bridge' };
   } catch {
-    // Bridge unreachable or the bounded timeout fired — fall back to `docker stop` below.
+    // Bridge unreachable, non-ok, or the bounded timeout fired — best-effort only, ignored
+    // either way: the real stop below always runs regardless.
   } finally {
     clearTimeout(timer);
   }
   await runDocker(['stop', name]);
+  try {
+    await runDocker(['rm', name]);
+  } catch {
+    // Already removed (e.g. a concurrent stop) or racing removal — not fatal, `docker stop`
+    // above already succeeded so the sandbox is no longer running.
+  }
   return { method: 'docker' };
 }

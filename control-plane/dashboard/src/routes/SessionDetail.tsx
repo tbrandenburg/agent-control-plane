@@ -142,7 +142,7 @@ export function SessionDetail({ id }: { id: string }) {
             defaultModel={session.model ?? undefined}
             defaultReasoningEffort={session.reasoningEffort ?? undefined}
             disabled={sendPrompt.isPending}
-            onSubmit={(input) => sendPrompt.mutate(input)}
+            onSubmit={(input) => sendPrompt.mutateAsync(input)}
           />
         </div>
 

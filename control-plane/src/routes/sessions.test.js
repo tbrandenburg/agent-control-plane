@@ -9,6 +9,7 @@ vi.mock('../sandbox.js', () => ({
   run: vi.fn(),
   waitForHealth: vi.fn(),
   stop: vi.fn(),
+  inspect: vi.fn(),
 }));
 
 vi.mock('../bootstrap.js', () => ({
@@ -42,6 +43,7 @@ beforeEach(() => {
   vi.mocked(sandbox.run).mockReset();
   vi.mocked(sandbox.waitForHealth).mockReset();
   vi.mocked(sandbox.stop).mockReset();
+  vi.mocked(sandbox.inspect).mockReset();
   vi.mocked(bootstrap.bootstrapWorkspace).mockReset();
   vi.mocked(bootstrap.bootstrapWorkspace).mockResolvedValue({
     targetDir: '/workspace/target',
@@ -199,9 +201,62 @@ describe('GET /api/sessions', () => {
 });
 
 describe('GET /api/sessions/:id', () => {
-  it('returns the session with a null phase', async () => {
+  it('returns a null phase when the session has no container', async () => {
     const app = buildServer();
-    seedSession(getDb(app));
+    seedSession(getDb(app), { container_name: null });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/sessions/sess-1',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ id: 'sess-1', phase: null });
+    expect(sandbox.inspect).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('returns the real docker inspect phase for a live container', async () => {
+    const app = buildServer();
+    seedSession(getDb(app), { container_name: 'sandbox-sess-1' });
+    vi.mocked(sandbox.inspect).mockResolvedValue({
+      exists: true,
+      state: 'running',
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/sessions/sess-1',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ id: 'sess-1', phase: 'running' });
+    expect(sandbox.inspect).toHaveBeenCalledWith('sandbox-sess-1');
+    await app.close();
+  });
+
+  it('returns a null phase when the container no longer exists', async () => {
+    const app = buildServer();
+    seedSession(getDb(app), { container_name: 'sandbox-sess-1' });
+    vi.mocked(sandbox.inspect).mockResolvedValue({ exists: false });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/sessions/sess-1',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ id: 'sess-1', phase: null });
+    await app.close();
+  });
+
+  it('falls back to a null phase when sandbox.inspect throws', async () => {
+    const app = buildServer();
+    seedSession(getDb(app), { container_name: 'sandbox-sess-1' });
+    vi.mocked(sandbox.inspect).mockRejectedValue(new Error('docker not found'));
     await app.ready();
 
     const response = await app.inject({
@@ -648,8 +703,8 @@ describe('POST /api/sessions/:id/stop', () => {
     await app.close();
   });
 
-  it('proxies to sandbox.stop() and reports which path stopped it', async () => {
-    vi.mocked(sandbox.stop).mockResolvedValue({ method: 'bridge' });
+  it('proxies to sandbox.stop(), reports which path stopped it, and clears container_name', async () => {
+    vi.mocked(sandbox.stop).mockResolvedValue({ method: 'docker' });
     const app = buildServer();
     seedSession(getDb(app), { id: 'sess-1', container_name: 'sandbox-1' });
     await app.ready();
@@ -660,12 +715,17 @@ describe('POST /api/sessions/:id/stop', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ status: 'stopped', method: 'bridge' });
+    expect(response.json()).toEqual({ status: 'stopped', method: 'docker' });
     expect(sandbox.stop).toHaveBeenCalledWith('sandbox-1');
+
+    const row = getDb(app)
+      .prepare('SELECT container_name FROM sessions WHERE id = ?')
+      .get('sess-1');
+    expect(row.container_name).toBeNull();
     await app.close();
   });
 
-  it('returns 502 when both the bridge proxy and the docker stop fallback fail', async () => {
+  it('returns 502 and leaves container_name untouched when sandbox.stop() fails', async () => {
     vi.mocked(sandbox.stop).mockRejectedValue(
       new Error('docker: no such container'),
     );
@@ -680,6 +740,11 @@ describe('POST /api/sessions/:id/stop', () => {
 
     expect(response.statusCode).toBe(502);
     expect(response.json()).toEqual({ error: 'docker: no such container' });
+
+    const row = getDb(app)
+      .prepare('SELECT container_name FROM sessions WHERE id = ?')
+      .get('sess-1');
+    expect(row.container_name).toBe('sandbox-1');
     await app.close();
   });
 });

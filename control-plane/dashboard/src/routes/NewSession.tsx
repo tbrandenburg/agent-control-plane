@@ -26,6 +26,7 @@ export function NewSession() {
     useState<(typeof REASONING_EFFORTS)[number]>('high');
 
   const models = modelsData?.models ?? [];
+  const hasNoModels = modelsData !== undefined && models.length === 0;
   const selectedModel = model || models[0]?.id || '';
 
   async function handleSubmit(e: React.FormEvent) {
@@ -98,18 +99,25 @@ export function NewSession() {
           <label htmlFor="model" className="block text-sm font-medium">
             Model
           </label>
-          <select
-            id="model"
-            className="mt-1 w-full rounded-md border p-2 text-sm"
-            value={selectedModel}
-            onChange={(e) => setModel(e.target.value)}
-          >
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+          {hasNoModels ? (
+            <p role="alert" className="mt-1 text-sm text-red-600">
+              No models configured — check your platform config repo's{' '}
+              <code>opencode.jsonc</code>.
+            </p>
+          ) : (
+            <select
+              id="model"
+              className="mt-1 w-full rounded-md border p-2 text-sm"
+              value={selectedModel}
+              onChange={(e) => setModel(e.target.value)}
+            >
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div>
@@ -160,7 +168,10 @@ export function NewSession() {
               Cancel
             </Button>
           </Link>
-          <Button type="submit" disabled={createSession.isPending}>
+          <Button
+            type="submit"
+            disabled={createSession.isPending || hasNoModels}
+          >
             {createSession.isPending ? 'Creating…' : 'Create Session'}
           </Button>
         </div>

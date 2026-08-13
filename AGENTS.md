@@ -363,3 +363,22 @@
   `pnpm test` (vitest) does not run `tsc`, so this type error only surfaces via a separate
   `pnpm typecheck`/`tsc --noEmit` run; always run both after adding test files with typed mock
   assertions, not just the test runner.
+- 2026-08-13: A subagent's own assumed opencode SSE event shapes (`message.part.delta` carrying
+  `properties.part.{text,messageID}`, role living at `properties.part.role`) were never verified
+  against a real event stream before being coded into `Transcript.tsx`'s issue-#16 rewrite — the
+  subagent even flagged this exact risk in its own handoff, but it went unverified through review.
+  Real, live-captured events showed `message.part.delta` actually carries
+  `properties.{messageID,partID,delta}` (no `properties.part` at all) and role only ever appears
+  on separate `message.updated` frames' `properties.info.{id,role}`. This produced a shipped
+  regression (assistant replies never rendered anywhere, not even in the raw-events fallback) that
+  only surfaced during the coordinator's own real E2E pass, not in unit tests (whose fixtures
+  encoded the same wrong assumption). Rule: for any WS/SSE frame-parsing change, capture at least
+  one real, live event stream (`GET /api/sessions/:id/events` against a real session) and diff it
+  against the code's assumed shape *before* trusting unit-test fixtures — self-authored fixtures
+  can't catch a wrong-shape assumption because the same wrong assumption wrote both.
+- 2026-08-13: After editing dashboard source and rebuilding a Docker image for E2E verification,
+  re-running `docker compose build` alone is not sufficient if the Dockerfile `COPY`s a prebuilt
+  bundle (`control-plane/public`, populated by `make build`/`vite build`) rather than building it
+  in-container — a stale bundle from an earlier `make build` gets silently baked into the "new"
+  image, making a real code fix appear unfixed under E2E testing. Always re-run `make build`
+  immediately before any `docker compose build` used for verifying a dashboard-side fix.

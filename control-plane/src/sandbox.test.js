@@ -419,23 +419,33 @@ describe('waitForHealth', () => {
 });
 
 describe('stop', () => {
-  it('stops via the bridge proxy and never calls docker stop when the bridge responds ok', async () => {
+  it('always runs docker stop + docker rm even when the bridge abort succeeds', async () => {
     const fetchImpl = vi
       .fn()
       .mockResolvedValue(new Response(null, { status: 200 }));
+    vi.mocked(childProcess.spawn).mockImplementation(() =>
+      fakeChild({ stdout: 'sandbox-1\n' }),
+    );
 
     await expect(
       stop('sandbox-1', { fetchImpl, timeoutMs: 1000 }),
-    ).resolves.toEqual({ method: 'bridge' });
+    ).resolves.toEqual({ method: 'docker' });
 
     expect(fetchImpl).toHaveBeenCalledWith(
       'http://sandbox-1:8080/stop',
       expect.objectContaining({ method: 'POST' }),
     );
-    expect(childProcess.spawn).not.toHaveBeenCalled();
+    expect(childProcess.spawn).toHaveBeenCalledWith('docker', [
+      'stop',
+      'sandbox-1',
+    ]);
+    expect(childProcess.spawn).toHaveBeenCalledWith('docker', [
+      'rm',
+      'sandbox-1',
+    ]);
   });
 
-  it('falls back to docker stop when the bridge call rejects (e.g. connection refused)', async () => {
+  it('still runs docker stop when the bridge call rejects (e.g. connection refused)', async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
     vi.mocked(childProcess.spawn).mockImplementation(() =>
       fakeChild({ stdout: 'sandbox-1\n' }),
@@ -451,7 +461,7 @@ describe('stop', () => {
     ]);
   });
 
-  it('falls back to docker stop once the bridge-response timeout fires', async () => {
+  it('still runs docker stop once the bridge-response timeout fires', async () => {
     const fetchImpl = vi.fn(
       (_url, { signal } = {}) =>
         new Promise((_resolve, reject) => {
@@ -475,7 +485,7 @@ describe('stop', () => {
     ]);
   });
 
-  it('propagates the docker stop error when both the bridge and the fallback fail', async () => {
+  it('propagates the docker stop error and never attempts docker rm', async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
     vi.mocked(childProcess.spawn).mockImplementation(() =>
       fakeChild({ stderr: 'Error: No such container: sandbox-1', exitCode: 1 }),
@@ -484,6 +494,29 @@ describe('stop', () => {
     await expect(
       stop('sandbox-1', { fetchImpl, timeoutMs: 1000 }),
     ).rejects.toThrow(/No such container/);
+
+    expect(childProcess.spawn).not.toHaveBeenCalledWith('docker', [
+      'rm',
+      'sandbox-1',
+    ]);
+  });
+
+  it('does not throw when docker rm fails after a successful docker stop', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 200 }));
+    vi.mocked(childProcess.spawn)
+      .mockImplementationOnce(() => fakeChild({ stdout: 'sandbox-1\n' }))
+      .mockImplementationOnce(() =>
+        fakeChild({
+          stderr: 'Error: No such container: sandbox-1',
+          exitCode: 1,
+        }),
+      );
+
+    await expect(
+      stop('sandbox-1', { fetchImpl, timeoutMs: 1000 }),
+    ).resolves.toEqual({ method: 'docker' });
   });
 });
 

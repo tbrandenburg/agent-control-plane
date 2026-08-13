@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import '@testing-library/jest-dom';
 import type { EventRecord } from '@/api/client';
@@ -21,14 +21,14 @@ describe('Transcript', () => {
         id: 1,
         payload: JSON.stringify({
           type: 'message.part.delta',
-          properties: { part: { id: 'p1', text: 'Hel' } },
+          properties: { messageID: 'm1', partID: 'p1', delta: 'Hel' },
         }),
       }),
       event({
         id: 2,
         payload: JSON.stringify({
           type: 'message.part.delta',
-          properties: { part: { id: 'p2', text: 'World' } },
+          properties: { messageID: 'm2', partID: 'p2', delta: 'World' },
         }),
       }),
     ];
@@ -40,10 +40,13 @@ describe('Transcript', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 
-  it('shows a reload message on an invalid wsToken, not a silent disconnect', () => {
+  it('shows an accurate message on an invalid wsToken, not a silent disconnect', () => {
     render(<Transcript events={[]} status="closed" invalidToken={true} />);
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/reload/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /live updates aren't available/i,
+    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent(/reload/i);
   });
 
   it('shows a reconnecting message while status is reconnecting', () => {
@@ -52,5 +55,111 @@ describe('Transcript', () => {
     );
 
     expect(screen.getByRole('status')).toHaveTextContent(/reconnecting/i);
+  });
+
+  it('coalesces multiple delta chunks for the same message into one growing bubble', () => {
+    const events: EventRecord[] = [
+      event({
+        id: 1,
+        payload: JSON.stringify({
+          type: 'message.part.delta',
+          properties: { messageID: 'm1', partID: 'p1', delta: 'Hel' },
+        }),
+      }),
+      event({
+        id: 2,
+        payload: JSON.stringify({
+          type: 'message.part.delta',
+          properties: { messageID: 'm1', partID: 'p1', delta: 'lo' },
+        }),
+      }),
+      event({
+        id: 3,
+        payload: JSON.stringify({
+          type: 'message.part.delta',
+          properties: { messageID: 'm1', partID: 'p1', delta: ' world' },
+        }),
+      }),
+    ];
+
+    render(<Transcript events={events} status="open" invalidToken={false} />);
+
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(screen.getByText('Hello world')).toBeInTheDocument();
+  });
+
+  it('hides pure lifecycle events by default and reveals them via the raw-events toggle', () => {
+    const events: EventRecord[] = [
+      event({
+        id: 1,
+        payload: JSON.stringify({ type: 'session.updated', properties: {} }),
+      }),
+      event({
+        id: 2,
+        payload: JSON.stringify({ type: 'session.idle', properties: {} }),
+      }),
+      event({
+        id: 3,
+        payload: JSON.stringify({
+          type: 'message.part.delta',
+          properties: { messageID: 'm1', partID: 'p1', delta: 'hi' },
+        }),
+      }),
+    ];
+
+    render(<Transcript events={events} status="open" invalidToken={false} />);
+
+    expect(screen.queryByText('session.updated')).not.toBeInTheDocument();
+    expect(screen.queryByText('session.idle')).not.toBeInTheDocument();
+
+    const toggle = screen.getByRole('button', { name: /show raw events/i });
+    fireEvent.click(toggle);
+
+    expect(screen.getByText('session.updated')).toBeInTheDocument();
+    expect(screen.getByText('session.idle')).toBeInTheDocument();
+  });
+
+  it('visually distinguishes user prompts from assistant replies via role test-ids', () => {
+    const events: EventRecord[] = [
+      event({
+        id: 1,
+        payload: JSON.stringify({
+          type: 'message.updated',
+          properties: { info: { id: 'mu', role: 'user' } },
+        }),
+      }),
+      event({
+        id: 2,
+        payload: JSON.stringify({
+          type: 'message.part.updated',
+          properties: {
+            part: { id: 'u1', messageID: 'mu', text: 'What is 2+2?' },
+          },
+        }),
+      }),
+      event({
+        id: 3,
+        payload: JSON.stringify({
+          type: 'message.updated',
+          properties: { info: { id: 'ma', role: 'assistant' } },
+        }),
+      }),
+      event({
+        id: 4,
+        payload: JSON.stringify({
+          type: 'message.part.delta',
+          properties: { messageID: 'ma', partID: 'a1', delta: '4' },
+        }),
+      }),
+    ];
+
+    render(<Transcript events={events} status="open" invalidToken={false} />);
+
+    expect(screen.getByTestId('transcript-message-user')).toHaveTextContent(
+      'What is 2+2?',
+    );
+    expect(
+      screen.getByTestId('transcript-message-assistant'),
+    ).toHaveTextContent('4');
   });
 });
