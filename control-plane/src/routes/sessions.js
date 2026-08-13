@@ -188,9 +188,23 @@ export function registerSessionsRoutes(
       return { error: 'SESSION_NOT_FOUND' };
     }
 
-    // `docker inspect` phase lands in Step 2 — Phase 1's schema has no live-container
-    // column, so this is always `null` until that step wires in `sandbox.inspect()`.
-    return { ...sessionRowToJson(row), phase: null };
+    // Live container phase: only meaningful once a container has actually been spawned
+    // (`container_name` set by `spawnSandbox()`); a session that never got that far has no
+    // container to inspect, so `phase` stays `null` (same as any inspect failure below).
+    let phase = null;
+    if (row.container_name) {
+      try {
+        const info = await sandbox.inspect(row.container_name);
+        phase = info.exists ? (info.state ?? null) : null;
+      } catch (err) {
+        req.log?.warn?.(
+          { err, containerName: row.container_name },
+          'sandbox.inspect failed',
+        );
+      }
+    }
+
+    return { ...sessionRowToJson(row), phase };
   });
 
   app.get('/api/sessions/:id/events', async (req, reply) => {
