@@ -382,3 +382,19 @@
   in-container — a stale bundle from an earlier `make build` gets silently baked into the "new"
   image, making a real code fix appear unfixed under E2E testing. Always re-run `make build`
   immediately before any `docker compose build` used for verifying a dashboard-side fix.
+- 2026-08-13: When splitting a batch of issues (#18-#24) across 5 parallel subagent worktrees,
+  reading each target route handler's *actual current code* before writing the file-ownership
+  plan — not just the issue text — avoided an assumed conflict: `GET /api/sessions` already fully
+  supported `status`/`limit`/`offset` query params by the time #23 ("no filtering/pagination") was
+  filed, so #23 could be scoped frontend-only, eliminating any file overlap with #19's sibling fix
+  in the same route file's PATCH handler. A 5-minute `grep`/read of the handler up front let all 5
+  issues run as a true parallel octopus-merge with zero manual conflict resolution.
+- 2026-08-13: An octopus-merge of 5 independently-linted subagent branches can still reintroduce
+  fresh Biome formatting drift in a file the merge auto-resolved (each branch's own pre-merge
+  `biome check --write` only ever saw its own diff, not the merged result) — always re-run the
+  repo-root, read-only `pnpm exec biome check .` once immediately after any multi-branch merge,
+  before trusting the individual branches' own "lint passed" claims.
+- 2026-08-13: `make loc`'s repo-wide LOC ceiling can be pushed over budget by the *combined* sum of
+  several independently-small parallel fixes (5 subagents landing ~10-25 lines each) even though no
+  single fix looks like bloat in isolation — always re-run `make loc`/`node scripts/loc.mjs` once
+  after integrating parallel work, not only after each subagent's own individual diff.
