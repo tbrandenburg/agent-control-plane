@@ -26,6 +26,22 @@
   until step `00600`'s real E2E run caught it (see `docs/phase_02_findings.md` and
   [§8](docs/ARCHITECTURE.md) for the corrected precedence-chain analysis this rule protects).
 
+## Release Conventions
+
+- **Use `make release BUMP=patch|minor|major` (default `patch`) to cut a release** whenever a
+  merged change is meant to be deployed/tracked as a versioned artifact — e.g. after merging a PR
+  that should go live, or when a maintainer asks to "cut a release"/"bump the version"/"tag a
+  release". It bumps `package.json`'s `version` in the root **and every workspace package** to the
+  identical new value via pnpm's own `pnpm version` (no hand-edited/out-of-sync version fields),
+  requires a clean tree on `main` in sync with `origin/main`, runs `make lint typecheck test`
+  first, then commits, tags (`vX.Y.Z`), pushes, and creates a GitHub release via `gh release
+  create --generate-notes`. Do not hand-edit version fields or `git tag` manually — always go
+  through this target so every workspace package and the git tag stay in sync.
+- Not every merge needs a release — routine internal refactors, docs-only changes, or WIP commits
+  on a feature branch don't warrant one. Use judgment; when in doubt, ask before bumping a version.
+- After a release, `make deploy` (or CI's own deploy step) bakes the released commit's SHA into
+  `GET /version` — the git tag gives that SHA a human-readable version name to cross-reference.
+
 ## Key Pitfalls
 
 - A step file's presence in `docs/plan/steps/in-review/` (or even `closed/`) is not proof any of its

@@ -1,4 +1,4 @@
-.PHONY: help install run stop test lint build clean loc e2e typecheck sandbox-image deploy
+.PHONY: help install run stop test lint build clean loc e2e typecheck sandbox-image deploy release
 
 ## Default target — list all available targets.
 help:
@@ -74,3 +74,36 @@ deploy: build
 	GIT_SHA=$$(git rev-parse HEAD) docker compose build control-plane
 	docker compose up -d control-plane
 	@echo "Deployed. Verify with: curl http://localhost:$${HOST_PORT:-3000}/version"
+
+## Bump the version (BUMP=patch|minor|major, default patch) across every workspace package via
+## pnpm's own `version` command (kept in sync, not hand-edited — root + every `pnpm-workspace.yaml`
+## package.json get the identical new version), then commit, tag, push, and cut a GitHub release
+## via `gh`. Requires a clean tree on `main`, up to date with `origin/main`, and `make test`/`make
+## lint` passing first — the release counterpart to `make deploy`'s "verify what's live" problem,
+## a git tag plus GitHub release gives every redeploy an unambiguous, human-readable version to
+## check `GET /version`'s `gitSha` against, rather than only a raw commit hash.
+release:
+	@BUMP=$${BUMP:-patch}; \
+	case "$$BUMP" in major|minor|patch) ;; \
+		*) echo "ERROR: BUMP must be major, minor, or patch (got '$$BUMP')" >&2; exit 1 ;; \
+	esac; \
+	if [ -n "$$(git status --porcelain)" ]; then \
+		echo "ERROR: working tree is not clean — commit or stash first" >&2; exit 1; \
+	fi; \
+	branch=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$branch" != "main" ]; then \
+		echo "ERROR: release must be run from main (currently on $$branch)" >&2; exit 1; \
+	fi; \
+	git fetch origin main; \
+	if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then \
+		echo "ERROR: local main is not in sync with origin/main — pull/push first" >&2; exit 1; \
+	fi; \
+	$(MAKE) lint typecheck test; \
+	new_version=$$(pnpm version "$$BUMP" --no-git-tag-version | sed 's/^v//'); \
+	pnpm -r exec -- pnpm version "$$new_version" --no-git-tag-version --allow-same-version > /dev/null; \
+	git add -A; \
+	git commit -m "chore(release): v$$new_version"; \
+	git tag -a "v$$new_version" -m "v$$new_version"; \
+	git push origin main "v$$new_version"; \
+	gh release create "v$$new_version" --title "v$$new_version" --generate-notes; \
+	echo "Released v$$new_version — verify a redeploy with: curl <host>/version"
