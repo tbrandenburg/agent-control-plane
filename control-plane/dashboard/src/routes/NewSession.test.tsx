@@ -39,7 +39,9 @@ describe('NewSession — team config field', () => {
   it('omits teamConfigRepo from the create body when the field is left empty', async () => {
     const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
       if (String(url).includes('/api/models'))
-        return jsonResponse({ models: [{ id: 'litellm/model', name: 'M' }] });
+        return jsonResponse({
+          models: [{ id: 'opencode/big-pickle', name: 'M' }],
+        });
       return jsonResponse({ id: 'sess-1', wsToken: 'tok-1' });
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -69,7 +71,9 @@ describe('NewSession — team config field', () => {
   it('submits teamConfigRepo in the create body when filled', async () => {
     const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
       if (String(url).includes('/api/models'))
-        return jsonResponse({ models: [{ id: 'litellm/model', name: 'M' }] });
+        return jsonResponse({
+          models: [{ id: 'opencode/big-pickle', name: 'M' }],
+        });
       return jsonResponse({ id: 'sess-1', wsToken: 'tok-1' });
     });
     vi.stubGlobal('fetch', fetchMock);

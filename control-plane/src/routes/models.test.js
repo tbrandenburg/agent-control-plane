@@ -33,4 +33,16 @@ describe('GET /api/models', () => {
     expect(response.json()).toEqual({ models: MODEL_ALLOWLIST });
     await app.close();
   });
+
+  it('defaults to opencode/big-pickle first and never returns a litellm/* entry', async () => {
+    const app = buildServer();
+    await app.ready();
+
+    const response = await app.inject({ method: 'GET', url: '/api/models' });
+    const { models } = response.json();
+
+    expect(models[0].id).toBe('opencode/big-pickle');
+    expect(models.some((model) => model.id.startsWith('litellm/'))).toBe(false);
+    await app.close();
+  });
 });

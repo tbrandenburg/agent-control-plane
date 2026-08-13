@@ -25,11 +25,11 @@
 direct analog of one K8s Job per session). Arguments: `--name <container_name>`, `--network egress-net`
 (**PHASE-4: becomes `sandbox-net` with `internal: true`**), `-v <host repo path>:/workspace/repo:ro`
 (hardcoded pre-cloned repo this phase), `-e SESSION_ID`, `-e CONTROL_PLANE_URL`,
-`-e OPENCODE_CONFIG_CONTENT`, `-e LITELLM_*` (**PHASE-4: injected by the Caddy proxy instead**).
+`-e OPENCODE_CONFIG_CONTENT`, `-e MODEL_GATEWAY_*` (**PHASE-4: injected by the Caddy proxy instead**).
 
 `OPENCODE_CONFIG_CONTENT` is the minimal non-negotiable layer from [§8](./ARCHITECTURE.md): `model`,
-`autoupdate: false`, and the `provider.litellm` block. In this phase `baseURL` points straight at
-LiteLLM; Phase 4 repoints it at `http://sandbox-proxy:8080/litellm`.
+`autoupdate: false`, and the `provider.<gateway>` block. In this phase `baseURL` points straight at
+the model gateway; Phase 4 repoints it at `http://sandbox-proxy:8080/gateway`.
 
 ##### `sandbox.inspect(name)`
 `docker inspect` → `{ exists, state }`. Shape it exactly as [§7](./ARCHITECTURE.md)'s

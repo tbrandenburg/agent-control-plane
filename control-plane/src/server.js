@@ -36,6 +36,16 @@ export function buildServer() {
 
   app.get('/health', async () => ({ status: 'ok' }));
 
+  // Exposes the image's build-time git SHA (baked in via the `GIT_SHA` build arg —
+  // `control-plane/Dockerfile`, `docker-compose.yml`) so a redeploy can be verified against
+  // `git rev-parse HEAD` instead of trusting "code merged"/"tests passed" alone (issue #18: a
+  // merged, unit-tested fix silently ran stale in a container built ~53 minutes before the fix
+  // was authored). Falls back to `'unknown'` for a local `node control-plane/src/server.js` run
+  // outside any Docker build.
+  app.get('/version', async () => ({
+    gitSha: process.env.GIT_SHA ?? 'unknown',
+  }));
+
   // Encapsulated so the `await` on `@fastify/websocket`'s registration completes (and its
   // `onRoute` hook is installed) before `registerWsRoutes` declares the `{ websocket: true }`
   // route — declaring it in the same synchronous tick as an un-awaited `register()` leaves

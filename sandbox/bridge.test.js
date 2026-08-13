@@ -21,23 +21,23 @@ import {
 
 describe('splitModel', () => {
   it('splits on the first slash only, keeping further slashes in modelID', () => {
-    assert.deepEqual(splitModel('litellm/eu.anthropic.claude-sonnet-4-6'), {
-      providerID: 'litellm',
-      modelID: 'eu.anthropic.claude-sonnet-4-6',
+    assert.deepEqual(splitModel('opencode/big-pickle'), {
+      providerID: 'opencode',
+      modelID: 'big-pickle',
     });
   });
 });
 
 describe('buildPromptBody', () => {
   it('omits variant entirely when reasoningEffort is unset', () => {
-    const body = buildPromptBody({ model: 'litellm/claude', content: 'hi' });
+    const body = buildPromptBody({ model: 'opencode/claude', content: 'hi' });
     assert.equal('variant' in body.model, false);
     assert.deepEqual(body.parts, [{ type: 'text', text: 'hi' }]);
   });
 
   it('includes variant when reasoningEffort is set', () => {
     const body = buildPromptBody({
-      model: 'litellm/claude',
+      model: 'opencode/claude',
       content: 'hi',
       reasoningEffort: 'high',
     });
@@ -294,7 +294,7 @@ describe('createBridge POST /stop', () => {
     const promptRes = await fetch(`http://127.0.0.1:${port}/prompt`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ content: 'hi', model: 'litellm/claude-sonnet' }),
+      body: JSON.stringify({ content: 'hi', model: 'opencode/big-pickle' }),
     });
     assert.equal(promptRes.status, 200);
 

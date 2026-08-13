@@ -304,4 +304,4 @@ if significant time has passed — dates matter here, not just tool names.
 | Caddy | ✅ | `caddy:2-alpine` still correct — latest is v2.11.4, no v3 exists |
 | `openid-client` | ✅ | v6.x is current; its functional API (`discovery()`, `buildAuthorizationUrl()`, `tokenIntrospection()`) is exactly what `ARCHITECTURE.md` §11 already shows — no stale v5 class-based API present |
 | Docker Compose file syntax | ✅ | No top-level `version:` key in §12's snippet — already correct per current Compose Spec (that key is deprecated) |
-| LiteLLM | Not checked | External gateway product name/API, not a versioned dependency choice this project controls the same way — no action needed unless a specific API incompatibility surfaces during implementation |
+| Model gateway product | Not checked | External gateway product name/API, not a versioned dependency choice this project controls the same way — no action needed unless a specific API incompatibility surfaces during implementation |

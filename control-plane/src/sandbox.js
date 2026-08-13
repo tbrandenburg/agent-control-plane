@@ -143,11 +143,6 @@ export async function run(session, env = process.env) {
   args.push(
     '-e',
     `OPENCODE_CONFIG_CONTENT=${buildOpencodeConfig(session)}`,
-    // PHASE-4: injected by the Caddy sandbox-proxy instead of a raw env var.
-    '-e',
-    `LITELLM_BASE_URL=${env.LITELLM_BASE_URL ?? ''}`,
-    '-e',
-    `LITELLM_API_KEY=${env.LITELLM_API_KEY ?? ''}`,
     image,
   );
 

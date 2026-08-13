@@ -20,7 +20,7 @@ export const DEFAULT_OC_URL = 'http://127.0.0.1:4096';
 /**
  * Splits a `provider/model` string on the FIRST `/` only — model ids can legitimately contain
  * further slashes (this step's Gotchas).
- * @param {string} model - e.g. `litellm/eu.anthropic.claude-sonnet-4-6`.
+ * @param {string} model - e.g. `opencode/big-pickle`.
  * @returns {{providerID: string, modelID: string}} The split provider/model pair.
  */
 export function splitModel(model) {

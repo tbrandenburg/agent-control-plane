@@ -391,6 +391,29 @@ export function registerSessionsRoutes(
       return { error: 'SESSION_NOT_FOUND' };
     }
 
+    // Archive implies teardown: tear down the live container (if any) so archiving a
+    // session doesn't leak a running sandbox indefinitely (issue #19). A stop failure is
+    // non-fatal to the archive itself — the DB status still flips to `archived` even if the
+    // container stop/removal fails; it can be cleaned up manually later.
+    if (status === 'archived') {
+      const preRow = /** @type {SessionRow|undefined} */ (
+        db.prepare('SELECT container_name FROM sessions WHERE id = ?').get(id)
+      );
+      if (preRow?.container_name) {
+        try {
+          await sandbox.stop(preRow.container_name);
+          db.prepare(
+            'UPDATE sessions SET container_name = NULL WHERE id = ?',
+          ).run(id);
+        } catch (err) {
+          req.log?.error?.(
+            { err, containerName: preRow.container_name },
+            'failed to stop sandbox container while archiving session',
+          );
+        }
+      }
+    }
+
     db.prepare(
       "UPDATE sessions SET status = ?, updated_at = datetime('now') WHERE id = ?",
     ).run(status, id);

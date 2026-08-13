@@ -122,7 +122,7 @@ make loc     # LOC budget report
   design to a later phase.
 - **Bootstrap has no retry/continuation logic.** A single failed clone attempt marks the session
   `pending_bootstrap-failed` permanently; the user must create a new session to retry.
-- **Model allowlist is a static list** (currently a single `litellm/...` entry) shown in the
+- **Model allowlist is a static list** (currently a single `opencode/...` entry) shown in the
   dashboard's dropdown; the API itself only validates model-id syntax, so any syntactically valid
   `provider/model` (like `opencode/big-pickle`, used in this handover's own live demo) can be passed
   directly via the API even though it isn't in the dashboard's dropdown yet.

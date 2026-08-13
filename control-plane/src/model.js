@@ -6,7 +6,7 @@
 
 /**
  * Splits a `provider/model` string on the FIRST `/` only — model ids can legitimately contain
- * further slashes (e.g. `litellm/eu.anthropic.claude-sonnet-4-6`, or `litellm/a/b`).
+ * further slashes (e.g. `opencode/big-pickle`, or `provider/a/b`).
  * @param {string} model - Raw model reference.
  * @returns {{providerID: string, modelID: string}} The split provider/model pair.
  */

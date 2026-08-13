@@ -1,6 +1,6 @@
 /**
  * `GET /api/models` — static, hand-curated allowlist from `config.js` (ARCHITECTURE.md §5). No
- * LiteLLM query, no cache. UI/discovery only — not a validation gate (see `model.js`).
+ * Static allowlist query, no cache. UI/discovery only — not a validation gate (see `model.js`).
  */
 
 import { MODEL_ALLOWLIST } from '../config.js';

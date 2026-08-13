@@ -2,21 +2,21 @@
 
 ## Gap
 
-`e2e/tests/session-lifecycle.spec.ts` and `docker-compose.yml` default to `litellm/stub-model`,
+`e2e/tests/session-lifecycle.spec.ts` and `docker-compose.yml` default to `opencode/big-pickle`,
 resolved via `e2e/fixtures/stub-model-server.mjs` (a local OpenAI-Chat-Completions-compatible
-stand-in) and `LITELLM_BASE_URL`/`LITELLM_API_KEY`. This only ever worked because Phase 1's original
-`buildOpencodeConfig()` injected enough of a provider block directly for `litellm/stub-model` to
+stand-in) and `MODEL_GATEWAY_BASE_URL`/`MODEL_GATEWAY_API_KEY`. This only ever worked because Phase 1's original
+`buildOpencodeConfig()` injected enough of a provider block directly for `opencode/big-pickle` to
 resolve. Step `00200`'s Option C decision (closed, correct per `ARCHITECTURE.md` §8's corrected
 precedence-chain analysis) removed that injection entirely — `OPENCODE_CONFIG_CONTENT` now composes
 only `{model, autoupdate}` — but nothing re-ran `make e2e` against the new code until step `00600`,
-four steps later. When it finally did, a real prompt against `litellm/stub-model` failed with
-`ProviderModelNotFoundError: Model not found: litellm/stub-model` (recorded in
+four steps later. When it finally did, a real prompt against `opencode/big-pickle` failed with
+`ProviderModelNotFoundError: Model not found: opencode/big-pickle` (recorded in
 `docs/phase_02_findings.md` §2), since no real Platform config repo is ever cloned to supply the
-`litellm` provider (see step `00601`).
+a gateway provider (see step `00601`).
 
 Step `00600` unblocked its own scope by switching `e2e/tests/session-lifecycle.spec.ts` to
 `opencode/big-pickle` — a real, free, zero-credential model bundled natively with `opencode` itself
-(no `auth.json` entry, no Platform-config-repo provider block, no `LITELLM_BASE_URL`/API key
+(no `auth.json` entry, no Platform-config-repo provider block, no `MODEL_GATEWAY_BASE_URL`/API key
 required), confirmed live to stream a full, real turn from inside the sandbox image.
 
 **Scope caution — do not over-fit to `opencode/big-pickle` specifically.** It is one convenient,
@@ -46,7 +46,7 @@ which model/config mechanism is "the" production answer.
 
 1. In `docker-compose.yml`, change the `control-plane` service's default model expectations and the
    `stub-model` service's role: either (a) remove the `stub-model` service and
-   `LITELLM_BASE_URL`/`LITELLM_API_KEY` defaults entirely and use a real, zero-config bundled model
+   `MODEL_GATEWAY_BASE_URL`/`MODEL_GATEWAY_API_KEY` defaults entirely and use a real, zero-config bundled model
    (e.g. `opencode/big-pickle`, or whichever such model is current/available at implementation time —
    treat the specific model id as a swappable fixture choice, not a pinned requirement) as the E2E
    default, or (b) keep `stub-model` only as an opt-in fixture for future tests that specifically need
@@ -56,12 +56,12 @@ which model/config mechanism is "the" production answer.
    in this step's own commit/PR description.
 2. Delete `e2e/fixtures/stub-model-server.mjs` if Action 1 chose removal; otherwise leave it in place
    but update its header comment to state it is no longer the default and why.
-3. Grep the repo for any remaining references to `litellm/stub-model`/`stub-model-server` outside
+3. Grep the repo for any remaining references to `opencode/big-pickle`/`stub-model-server` outside
    what Action 1/2 intentionally keeps (e.g. stale comments in `docker-compose.yml`,
    `Makefile`, other E2E specs) and update or remove them.
 4. Add a short, dated addendum section to `docs/phase_01_findings.md` (append-only, do not rewrite
    its existing evidence) stating: as of Phase 2 Step `00200`'s Option C decision, the exact
-   `litellm/stub-model` reproduction path this document describes no longer resolves standalone —
+   `opencode/big-pickle` reproduction path this document describes no longer resolves standalone —
    point readers at whichever fixture Action 1 chose, or a real Platform config repo (step `00601`),
    instead. This prevents a future reader from treating stale, no-longer-reproducible evidence as
    still-current. Do not present the chosen E2E fixture model as a production design decision.

@@ -119,12 +119,12 @@ pass before its first `/prompt` call, retrying with backoff on connection-refuse
 ([§4](./ARCHITECTURE.md)). `running`/`stopped`/`failed` are **derived** in the dashboard from the live
 `docker inspect` phase returned alongside the row ([`UI.md` §1](./UI.md)) — the backend never stores them.
 
-**Networking (temporary).** Sandbox containers join `egress-net` and receive the LiteLLM base URL and
+**Networking (temporary).** Sandbox containers join `egress-net` and receive the model gateway base URL and
 API key directly as env vars. This violates the secret-custody boundary of [§2](./ARCHITECTURE.md) by
 design and is closed in Phase 4. [`ROADMAP.md`](./ROADMAP.md)'s deferral table actually tracks this as
 **three separate** P1→P4 items (`internal: true` isolation, Caddy credential injection, per-session
 `INTERNAL_TOKEN`), not one — so this must be marked with an explicit `PHASE-4` comment **at each of the
-distinct code sites it touches** (the `--network` flag, the `-e LITELLM_*`/`OPENCODE_CONFIG_CONTENT`
+distinct code sites it touches** (the `--network` flag, the `-e MODEL_GATEWAY_*`/`OPENCODE_CONFIG_CONTENT`
 env injection, and the missing `INTERNAL_TOKEN` check on `/internal/*`), not a single marker.
 
 ## Changes
@@ -172,7 +172,7 @@ Phase 1 exit criterion executed verbatim.
 ### Error Paths
 
 - `POST /api/sessions` with `model: "claude-sonnet"` (no `/`) → `400 INVALID_MODEL_REFERENCE`.
-- `POST /api/sessions` with `model: "litellm/not-in-allowlist"` → **`201`, accepted** — the allowlist is
+- `POST /api/sessions` with `model: "opencode/not-in-allowlist"` → **`201`, accepted** — the allowlist is
   UI-only and must not gate ([§5](./ARCHITECTURE.md)).
 - `POST /api/sessions/:id/prompt` for an unknown session id → `404`, no container touched.
 - Prompt sent while the sandbox is still unhealthy → the readiness wait retries and then either succeeds
@@ -321,11 +321,11 @@ Green; `002` applies once; LOC total consistent with [§14](./ARCHITECTURE.md)'s
 direct analog of one K8s Job per session). Arguments: `--name <container_name>`, `--network egress-net`
 (**PHASE-4: becomes `sandbox-net` with `internal: true`**), `-v <host repo path>:/workspace/repo:ro`
 (hardcoded pre-cloned repo this phase), `-e SESSION_ID`, `-e CONTROL_PLANE_URL`,
-`-e OPENCODE_CONFIG_CONTENT`, `-e LITELLM_*` (**PHASE-4: injected by the Caddy proxy instead**).
+`-e OPENCODE_CONFIG_CONTENT`, `-e MODEL_GATEWAY_*` (**PHASE-4: injected by the Caddy proxy instead**).
 
 `OPENCODE_CONFIG_CONTENT` is the minimal non-negotiable layer from [§8](./ARCHITECTURE.md): `model`,
-`autoupdate: false`, and the `provider.litellm` block. In this phase `baseURL` points straight at
-LiteLLM; Phase 4 repoints it at `http://sandbox-proxy:8080/litellm`.
+`autoupdate: false`, and the `provider.<gateway>` block. In this phase `baseURL` points straight at
+the model gateway; Phase 4 repoints it at `http://sandbox-proxy:8080/gateway`.
 
 ##### `sandbox.inspect(name)`
 `docker inspect` → `{ exists, state }`. Shape it exactly as [§7](./ARCHITECTURE.md)'s
@@ -471,7 +471,7 @@ two-turn run"), not a suggestion. Follow it literally.
 - `GET /session/{id}/event` **does not exist** — using it is the single most likely implementation mistake here.
 - SSE frames can split across chunk boundaries; buffer until a blank-line delimiter.
 - `splitModel` splits on the **first** `/` — model ids legitimately contain further slashes.
-- The bridge must not hold any external secret ([§3](./ARCHITECTURE.md)); in Phase 1 the LiteLLM key
+- The bridge must not hold any external secret ([§3](./ARCHITECTURE.md)); in Phase 1 the model gateway key
   transits via opencode's config env, which is exactly the Phase 4 debt being tracked.
 
 ##### Out of Scope
@@ -488,7 +488,7 @@ Run the bridge against a stub SSE server emitting a recorded real frame sequence
 `properties.sessionID` are filtered out.
 
 ##### Unit
-SSE chunk-boundary buffering; `splitModel` on `litellm/eu.anthropic.claude-sonnet-4-6`; `variant` omitted
+SSE chunk-boundary buffering; `splitModel` on `opencode/big-pickle`; `variant` omitted
 vs. present in the `prompt_async` body.
 
 #### Validation
@@ -536,7 +536,7 @@ to the bridge's `POST /prompt`. Return the bridge's ack. No queue, no ack table,
 is Phase 3; a dead sandbox is a plain error this phase.
 
 ##### `GET /api/models` and validation
-Return `{ models: MODEL_ALLOWLIST }` from `config.js` — static, hand-curated, no LiteLLM query, no cache
+Return `{ models: MODEL_ALLOWLIST }` from `config.js` — static, hand-curated, no live gateway query, no cache
 ([§5](./ARCHITECTURE.md)). Validation is **syntax only**: non-empty `provider` and `model` around the
 first `/`, else `400 INVALID_MODEL_REFERENCE`. **Do not check allowlist membership** — [§5](./ARCHITECTURE.md)
 states this explicitly as a confirmed production behaviour and warns against adding a stricter gate.
@@ -577,8 +577,8 @@ Covered in Step 6.
 Create → prompt → events flow with a stubbed sandbox module; the 404/503 paths; `GET /api/models` shape.
 
 ##### Unit
-Model syntax validation table: `litellm/x` valid, `x` invalid, `/x` invalid, `x/` invalid,
-`litellm/a/b` valid with `modelID = "a/b"`, and a non-allowlisted but well-formed id **accepted**.
+Model syntax validation table: `opencode/x` valid, `x` invalid, `/x` invalid, `x/` invalid,
+`opencode/a/b` valid with `modelID = "a/b"`, and a non-allowlisted but well-formed id **accepted**.
 
 #### Validation
 

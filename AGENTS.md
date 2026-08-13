@@ -16,7 +16,7 @@
 - **Model-resolution / config-composition changes require a real E2E gate in the same step.**
   Any implementation step whose `Changes` touch model-resolution or config-composition logic
   (non-exhaustive examples: `OPENCODE_CONFIG_CONTENT` composition, bootstrap/clone wiring,
-  provider defaults, `LITELLM_*`/`OPENCODE_*` env vars passed into the sandbox container) **must**
+  provider defaults, `OPENCODE_*` env vars passed into the sandbox container) **must**
   include a real, executed end-to-end prompt check in its own `Validation` → `Commands` — at
   minimum, a single real prompt against a real, already-passing session scenario (e.g.
   `opencode/big-pickle`, per step `00602`) proving a model still resolves. This check is required
@@ -204,13 +204,13 @@
   `00601`, matching this repo's own `00201`/`00202`/`00301`/`00401` pattern) independent of whether
   `make e2e` itself is green. **Do not confuse this with a model-provider/E2E-blocking issue** — see
   the next bullet for how that part is actually resolved.
-- `litellm/stub-model` (Phase 1's e2e fixture model) requires a provider block only a real Platform
-  config repo supplies, which — per the bullet above — nothing in this stack ever clones; a live E2E
-  run against it produces `session.error` / `"ProviderModelNotFoundError: ... Model not found:
-  litellm/stub-model"`. The fix is not to build that wiring for E2E purposes: `opencode/big-pickle`
-  (and opencode's other bundled `*-free` models) is a real, free, zero-credential model `opencode`
-  resolves natively — no `auth.json` entry, no Platform-config-repo provider block, no
-  `LITELLM_BASE_URL`/API key required — confirmed live by running the sandbox image standalone with
+- The Phase 1 e2e fixture model (a hypothetical gateway-routed model requiring a provider block only
+  a real Platform config repo supplies, which — per the bullet above — nothing in this stack ever
+  clones) produces `session.error` / `"ProviderModelNotFoundError: ... Model not found: ..."`. The
+  fix is not to build that wiring for E2E purposes: `opencode/big-pickle` (and opencode's other
+  bundled `*-free` models) is a real, free, zero-credential model `opencode` resolves natively — no
+  `auth.json` entry, no Platform-config-repo provider block, no gateway base URL/API key
+  required — confirmed live by running the sandbox image standalone with
   only `OPENCODE_CONFIG_CONTENT='{"model":"opencode/big-pickle","autoupdate":false}'` and driving a
   full real turn through `opencode serve`'s own API. Use `opencode/big-pickle` (or any other
   zero-config bundled model — it is one convenient E2E-fixture option, not a pinned requirement) for
@@ -382,3 +382,19 @@
   in-container — a stale bundle from an earlier `make build` gets silently baked into the "new"
   image, making a real code fix appear unfixed under E2E testing. Always re-run `make build`
   immediately before any `docker compose build` used for verifying a dashboard-side fix.
+- 2026-08-13: When splitting a batch of issues (#18-#24) across 5 parallel subagent worktrees,
+  reading each target route handler's *actual current code* before writing the file-ownership
+  plan — not just the issue text — avoided an assumed conflict: `GET /api/sessions` already fully
+  supported `status`/`limit`/`offset` query params by the time #23 ("no filtering/pagination") was
+  filed, so #23 could be scoped frontend-only, eliminating any file overlap with #19's sibling fix
+  in the same route file's PATCH handler. A 5-minute `grep`/read of the handler up front let all 5
+  issues run as a true parallel octopus-merge with zero manual conflict resolution.
+- 2026-08-13: An octopus-merge of 5 independently-linted subagent branches can still reintroduce
+  fresh Biome formatting drift in a file the merge auto-resolved (each branch's own pre-merge
+  `biome check --write` only ever saw its own diff, not the merged result) — always re-run the
+  repo-root, read-only `pnpm exec biome check .` once immediately after any multi-branch merge,
+  before trusting the individual branches' own "lint passed" claims.
+- 2026-08-13: `make loc`'s repo-wide LOC ceiling can be pushed over budget by the *combined* sum of
+  several independently-small parallel fixes (5 subagents landing ~10-25 lines each) even though no
+  single fix looks like bloat in isolation — always re-run `make loc`/`node scripts/loc.mjs` once
+  after integrating parallel work, not only after each subagent's own individual diff.

@@ -77,7 +77,7 @@ two-turn run"), not a suggestion. Follow it literally.
 - `GET /session/{id}/event` **does not exist** — using it is the single most likely implementation mistake here.
 - SSE frames can split across chunk boundaries; buffer until a blank-line delimiter.
 - `splitModel` splits on the **first** `/` — model ids legitimately contain further slashes.
-- The bridge must not hold any external secret ([§3](./ARCHITECTURE.md)); in Phase 1 the LiteLLM key
+- The bridge must not hold any external secret ([§3](./ARCHITECTURE.md)); in Phase 1 the model gateway key
   transits via opencode's config env, which is exactly the Phase 4 debt being tracked.
 
 ##### Out of Scope
@@ -94,7 +94,7 @@ Run the bridge against a stub SSE server emitting a recorded real frame sequence
 `properties.sessionID` are filtered out.
 
 ##### Unit
-SSE chunk-boundary buffering; `splitModel` on `litellm/eu.anthropic.claude-sonnet-4-6`; `variant` omitted
+SSE chunk-boundary buffering; `splitModel` on `opencode/big-pickle`; `variant` omitted
 vs. present in the `prompt_async` body.
 
 #### Validation

@@ -41,7 +41,7 @@ remain that block starting implementation — see the "round 3"/"round 4" callou
 | Python supervisor in sandbox | Node.js bridge script (~60-80 LOC) | Shares language/types with control plane, avoids a second toolchain |
 | PVC, 7-day retention, K8s reattach semantics | Named Docker volume per session + hourly reaper `setInterval` | Direct, much smaller analog — volumes persist independently of containers exactly like a PVC |
 | GitHub webhook (Fastify + signature lib) | Raw `node:crypto` HMAC compare (~15 LOC) | No library needed for HMAC-SHA256 compare |
-| Open-ended `GET /models` provider catalog | Static allowlist of pre-approved `provider/model` strings in `config.js`, env-configurable | No multi-provider catalog requirement — this deployment only ever talks to one LiteLLM endpoint with a small, operator-curated model list (added §15.7, previously an undeclared narrowing) |
+| Open-ended `GET /models` provider catalog | Static allowlist of pre-approved `provider/model` strings in `config.js`, env-configurable | No multi-provider catalog requirement — this deployment only ever talks to one model gateway endpoint with a small, operator-curated model list (added §15.7, previously an undeclared narrowing) |
 
 **Kept as-is** (these are genuinely necessary, not overengineering):
 - The three-layer `opencode` config system (platform/team/repo + non-negotiable `OPENCODE_CONFIG_CONTENT`)
@@ -71,9 +71,9 @@ sandbox container ── bridge.js (Node) ── opencode serve (localhost:4096,
    │  network: sandbox-net (internal: true — NO route to internet)
    ▼
 sandbox-proxy container (Caddy) ── bridges sandbox-net + egress-net
-   │  injects Authorization headers, routes /github/* and /litellm/* by hostname
+   │  injects Authorization headers, routes /github/* and /gateway/* by hostname
    ▼
-Real GitHub / LiteLLM endpoints (egress-net → host internet)
+Real GitHub / model gateway endpoints (egress-net → host internet)
 ```
 
 Key insight from research: the sandbox container is **structurally incapable** of reaching the
@@ -98,8 +98,8 @@ a `/api/*`-prefixed mirror; the ones we need:
 - `POST /session/{sessionID}/prompt_async` → `204` (fire-and-forget). **Correction to earlier draft:**
   the `model` field in the request body is **not** a flat `"provider/model"` string — the real schema is
   a nested object: `{ model: { providerID: string, modelID: string }, agent?, parts: [...], noReply?,
-  tools?, system?, variant?, messageID? }`. The bridge must split `litellm/eu.anthropic.claude-sonnet-4-6`
-  on the first `/` into `{ providerID: "litellm", modelID: "eu.anthropic.claude-sonnet-4-6" }` before
+  tools?, system?, variant?, messageID? }`. The bridge must split `opencode/big-pickle`
+  on the first `/` into `{ providerID: "gateway", modelID: "eu.anthropic.claude-sonnet-4-6" }` before
   calling this endpoint (same first-`/`-only split rule the source doc already specifies for its own API).
 - `GET /event` (and session-scoped `GET /session/{sessionID}/event`) — SSE stream of all bus events.
 - Full path list has ~150 routes (session forking, revert/commit, permissions, LSP, PTY, MCP management,
@@ -294,13 +294,13 @@ on disk.
 ```jsonc
 // OPENCODE_CONFIG_CONTENT (set by control-plane at spawn time, non-negotiable layer)
 {
-  "model": "litellm/eu.anthropic.claude-sonnet-4-6",
+  "model": "opencode/big-pickle",
   "autoupdate": false,
   "provider": {
-    "litellm": {
+    "gateway": {
       "npm": "@ai-sdk/openai-compatible",
       "options": {
-        "baseURL": "http://sandbox-proxy:8080/litellm",
+        "baseURL": "http://sandbox-proxy:8080/gateway",
         "apiKey": "unused-injected-by-proxy"
       }
     }
@@ -628,7 +628,7 @@ services:
     volumes: [./proxy/Caddyfile:/etc/caddy/Caddyfile:ro]
     environment:
       GITHUB_TOKEN: ${GITHUB_TOKEN}
-      LITELLM_API_KEY: ${LITELLM_API_KEY}
+      MODEL_GATEWAY_API_KEY: ${MODEL_GATEWAY_API_KEY}
 
   # sandbox containers are spawned dynamically by control-plane via `docker run`,
   # always attached to `sandbox-net` only (never egress-net, never the docker socket).
@@ -645,9 +645,9 @@ services:
       header_up Host api.github.com
     }
   }
-  handle_path /litellm/* {
-    reverse_proxy https://litellm.internal.example.com {
-      header_up Authorization "Bearer {env.LITELLM_API_KEY}"
+  handle_path /gateway/* {
+    reverse_proxy https://gateway.internal.example.com {
+      header_up Authorization "Bearer {env.MODEL_GATEWAY_API_KEY}"
     }
   }
 }
@@ -834,7 +834,7 @@ Of the source doc's 13 service endpoints, §4 routes 10. Covered: `POST /api/ses
 - `GET /api/models` — dropped, but `POST /api/sessions` and the WS `prompt` message still validate
   `provider/model` format per the doc's rule (§ "Model format" in `ai-coding-agent-doc.md`). Without
   this endpoint, clients have no way to discover valid values. **Decision: add it**, backed by a static
-  allowlist in `config.js` (no new infrastructure — just the two hardcoded `litellm/...` model IDs this
+  allowlist in `config.js` (no new infrastructure — just the two hardcoded `opencode/...` model IDs this
   thin deployment actually supports).
 - `GET /api/sessions/:id/artifacts` — dropped. **Decision: add it**, implemented as a projection of
   OpenCode's own `GET /session/:id/diff` (confirmed real, §11) — zero new sandbox-side code, only a
@@ -1151,7 +1151,7 @@ this resolving safely because the token used should already be scoped to have ac
    branch-name checkout, closing the concurrent-push race the doc requires (`ai-coding-agent-doc.md:348`).
 5. Before the cloned directory is bind-mounted into the sandbox: `git remote set-url origin
    <url-without-credential>` strips the embedded token from `.git/config`, preserving the "sandbox
-   never holds a secret" property even for the config/repo bind mounts, not just the LiteLLM/GitHub
+   never holds a secret" property even for the config/repo bind mounts, not just the model-gateway/GitHub
    API proxy path.
 
 **Corrected LOC: ~95** for the full 3-repo, SHA-pinned, dual-failure-mode `bootstrap.js` helper — within
@@ -1366,12 +1366,12 @@ unbudgeted since the whole mechanism was pointer-referenced rather than sized.
 
 ### 15.7 `GET /api/models` scope narrowing: now an explicit, declared deviation
 
-§14.1's implementation note that `/api/models` returns "the two hardcoded litellm/... model IDs this
+§14.1's implementation note that `/api/models` returns "the two hardcoded opencode/... model IDs this
 thin deployment actually supports" is a real behavior reduction vs. the source doc's implied
 open-ended provider catalog (`ai-coding-agent-doc.md:102`) that was never listed in §1's simplification
 table. **Resolution:** add to §1's table: "Open-ended `GET /models` provider catalog | Static
 allowlist of pre-approved `provider/model` strings in `config.js`, env-configurable | No multi-provider
-catalog requirement — this deployment only ever talks to one LiteLLM endpoint with a small, operator-
+catalog requirement — this deployment only ever talks to one model gateway endpoint with a small, operator-
 curated model list." No code change, documentation-only. **LOC: 0.**
 
 ### 15.8 Updated LOC budget

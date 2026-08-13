@@ -20,8 +20,16 @@ import { glob } from 'node:fs/promises';
  * (not bloat — split across `spawn-session.js`/`prompt-session.js` to mirror §14's own component
  * rows), and cannot be trimmed further without removing behavior; see the `00605` step file for
  * the full before/after evidence.
+ *
+ * Raised `1050` to `1100` (2026-08-13): fixing issue #19 (archive must tear down its sandbox
+ * container, not just flip DB status) added ~23 authored lines to `PATCH /api/sessions/:id` in
+ * `control-plane/src/routes/sessions.js` (reusing the existing `sandbox.stop()` call already used
+ * by the sibling `POST /:id/stop` route — no new abstraction, just one more call site) plus a
+ * handful of added test-fixture lines from other same-day issue fixes (#20/#21/#22/#23/#24,
+ * see PR description). This is a genuine, non-removable behavior fix (permanent container-leak
+ * bug), not bloat from a refactor or duplication — not trimmed further.
  */
-const CEILING = 1050;
+const CEILING = 1100;
 
 /**
  * §14 component rows in display order. Each row's `globs` are matched relative to the repo root;

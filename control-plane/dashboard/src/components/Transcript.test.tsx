@@ -162,4 +162,50 @@ describe('Transcript', () => {
       screen.getByTestId('transcript-message-assistant'),
     ).toHaveTextContent('4');
   });
+
+  it('renders a session.error event as an always-visible alert with a readable message', () => {
+    const events: EventRecord[] = [
+      event({
+        id: 1,
+        payload: JSON.stringify({
+          type: 'session.error',
+          properties: {
+            sessionID: 's1',
+            error: {
+              name: 'UnknownError',
+              data: { message: 'Model not found: opencode/stub-model' },
+            },
+          },
+        }),
+      }),
+    ];
+
+    render(<Transcript events={events} status="open" invalidToken={false} />);
+
+    const alerts = screen.getAllByRole('alert');
+    const errorAlert = alerts.find((el) =>
+      el.textContent?.includes('Model not found: opencode/stub-model'),
+    );
+    expect(errorAlert).toBeDefined();
+    // Must be visible without needing to toggle "Show raw events".
+    expect(
+      screen.queryByRole('button', { name: /show raw events/i }),
+    ).toBeNull();
+  });
+
+  it('falls back to the error name when no data.message is present', () => {
+    const events: EventRecord[] = [
+      event({
+        id: 1,
+        payload: JSON.stringify({
+          type: 'session.error',
+          properties: { error: { name: 'MessageAbortedError', data: {} } },
+        }),
+      }),
+    ];
+
+    render(<Transcript events={events} status="open" invalidToken={false} />);
+
+    expect(screen.getByText('MessageAbortedError')).toBeInTheDocument();
+  });
 });

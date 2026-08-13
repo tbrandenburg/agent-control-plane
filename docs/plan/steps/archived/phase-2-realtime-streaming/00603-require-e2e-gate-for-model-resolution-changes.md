@@ -22,7 +22,7 @@ regression, silently, for as many steps as happen to follow before the phase's o
    `~/.config/opencode/AGENTS.md`) — e.g. under a "Validation Conventions" section (create if none
    exists) — stating: any implementation step whose `Changes` touch model-resolution or
    config-composition logic (non-exhaustive examples: `OPENCODE_CONFIG_CONTENT` composition,
-   bootstrap/clone wiring, provider defaults, `LITELLM_*`/`OPENCODE_*` env vars passed into the
+   bootstrap/clone wiring, provider defaults, `MODEL_GATEWAY_*`/`OPENCODE_*` env vars passed into the
    sandbox container) **must** include a real, executed end-to-end prompt check in its own
    `Validation` → `Commands` — at minimum, a single real prompt against a real, already-passing
    session scenario (e.g. `opencode/big-pickle`, per step `00602`) proving a model still resolves —
