@@ -183,3 +183,58 @@ describe('SessionDetail — Stop/Archive buttons', () => {
     });
   });
 });
+
+describe('SessionDetail — archived composer', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    FakeWebSocket.instances = [];
+  });
+
+  it('renders a read-only notice instead of the composer when the session is archived', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
+      if (String(url).includes('/api/models'))
+        return jsonResponse({ models: [] });
+      return jsonResponse({ ...SESSION_BODY, status: 'archived' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderSessionDetail('s1');
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/this session is archived/i),
+      ).toBeInTheDocument(),
+    );
+
+    expect(
+      screen.queryByPlaceholderText(/prompt|message/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /send/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('still renders the composer for an active session', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
+      if (String(url).includes('/api/models'))
+        return jsonResponse({ models: [] });
+      return jsonResponse(SESSION_BODY);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderSessionDetail('s1');
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /send/i }),
+      ).toBeInTheDocument(),
+    );
+
+    expect(
+      screen.queryByText(/this session is archived/i),
+    ).not.toBeInTheDocument();
+  });
+});
