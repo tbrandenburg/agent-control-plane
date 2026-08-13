@@ -462,7 +462,11 @@ export function registerSessionsRoutes(
     // endpoint take 100+ seconds with ~20 stale sessions).
     await Promise.allSettled(
       rows
-        .filter((row) => row.container_name)
+        .filter(
+          /** @returns {row is SessionRow & {container_name: string}} */ (
+            row,
+          ) => Boolean(row.container_name),
+        )
         .map((row) =>
           sandbox.stop(row.container_name).catch((err) => {
             req.log?.error?.(
