@@ -26,9 +26,9 @@ services:
       SANDBOX_NETWORK: egress-net
       WORKSPACE_HOST_PATH: ${WORKSPACE_HOST_PATH:-${PWD}/workspace}
       CONTROL_PLANE_URL: http://control-plane:3000
-      # PHASE-2 (step 00602): no default LITELLM_BASE_URL/LITELLM_API_KEY are injected here.
+      # PHASE-2 (step 00602): no default gateway base URL/API key are injected here.
       # `OPENCODE_CONFIG_CONTENT` (control-plane/src/sandbox.js) composes only {model, autoupdate}
-      # (ARCHITECTURE.md §8 Option C) — model resolution for any `litellm/*` model id requires a
+      # (ARCHITECTURE.md §8 Option C) — model resolution for any gateway-routed model id requires a
       # real Platform config repo's own provider block (step 00601), not a control-plane default.
       # `make e2e` instead defaults to `opencode/big-pickle`, a real, free, zero-credential model
       # bundled natively with opencode (e2e/tests/session-lifecycle.spec.ts) — see

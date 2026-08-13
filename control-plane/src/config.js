@@ -9,7 +9,16 @@
  * @type {ReadonlyArray<{id: string, name: string}>}
  */
 export const MODEL_ALLOWLIST = [
-  { id: 'litellm/eu.anthropic.claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
+  { id: 'opencode/big-pickle', name: 'Big Pickle' },
+  { id: 'opencode/deepseek-v4-flash-free', name: 'DeepSeek V4 Flash (Free)' },
+  { id: 'opencode/hy3-free', name: 'HY3 (Free)' },
+  { id: 'opencode/laguna-s-2.1-free', name: 'Laguna S 2.1 (Free)' },
+  { id: 'opencode/mimo-v2.5-free', name: 'Mimo V2.5 (Free)' },
+  { id: 'opencode/nemotron-3-ultra-free', name: 'Nemotron 3 Ultra (Free)' },
+  {
+    id: 'opencode/nemotron-3.5-lightning-free',
+    name: 'Nemotron 3.5 Lightning (Free)',
+  },
 ];
 
 /**

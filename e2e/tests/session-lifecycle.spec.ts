@@ -9,7 +9,7 @@ import { TARGET_REPO_A } from '../fixtures/distinct-target-repos.mjs';
  * End-to-end vertical slice against the real `docker compose` stack (`make e2e` — no mocks of
  * Docker, `opencode serve`, or the bridge/SSE relay, and no mocked model provider either: this
  * spec uses `opencode/big-pickle`, a real, free, zero-credential model bundled natively with
- * `opencode` itself — no `LITELLM_BASE_URL`/API key/Platform-config-repo wiring required, and it
+ * `opencode` itself — no gateway base URL/API key/Platform-config-repo wiring required, and it
  * resolves correctly with only `OPENCODE_CONFIG_CONTENT`'s narrow `{model, autoupdate}` layer,
  * confirming Option C's decision is sufficient on its own for any model opencode already knows
  * about natively). Covers create (`202`, async bootstrap/spawn split) → `pending_bootstrap` →

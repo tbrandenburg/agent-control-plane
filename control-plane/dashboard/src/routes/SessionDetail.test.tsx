@@ -29,7 +29,7 @@ const SESSION_BODY = {
   title: 'Fix flaky test',
   repoOwner: 'acme',
   repoName: 'widgets',
-  model: 'litellm/model',
+  model: 'opencode/big-pickle',
   reasoningEffort: 'high',
   status: 'active',
   containerName: 'sandbox_s1',

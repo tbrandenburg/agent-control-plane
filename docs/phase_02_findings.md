@@ -110,12 +110,12 @@ this run actually saw (`auth`, above) rather than asserting a single brittle exp
 
 Live E2E verification (isolated `docker compose` stack, real `opencode/big-pickle` model,
 real prompt) initially hit a genuine blocker: `e2e/fixtures/stub-model-server.mjs` +
-`litellm/stub-model` (this repo's Phase 1 e2e model) requires a provider block that only a real
+`opencode/big-pickle` (this repo's Phase 1 e2e model) requires a provider block that only a real
 Platform config repo supplies, and — as detailed further down — no such repo is ever actually
 bootstrapped by this stack today. The fix was not to build that wiring, but to stop needing it for
 E2E purposes: **`opencode/big-pickle`** (and opencode's other bundled `*-free` models) is a real,
 free, zero-credential model resolved by `opencode` itself out of the box — no `auth.json` entry, no
-`OPENCODE_CONFIG`/Platform-config-repo provider block, and no `LITELLM_BASE_URL`/API key required.
+`OPENCODE_CONFIG`/Platform-config-repo provider block, and no `MODEL_GATEWAY_BASE_URL`/API key required.
 
 **Live verification, directly inside the sandbox image** (not simulated): ran
 `agent-sandbox:local` standalone with only `OPENCODE_CONFIG_CONTENT='{"model":"opencode/big-pickle","autoupdate":false}'`
@@ -126,7 +126,7 @@ real turn — `session.updated` → `message.updated` → `message.part.updated`
 (real streamed tokens) → `session.idle` — with real `cost`/`tokens` accounting, confirming Option C's
 narrow `{model, autoupdate}` composition is **sufficient on its own**, with zero additional wiring,
 for any model `opencode` already knows about natively (as opposed to a model that requires a
-provider registered via a Platform config repo, e.g. `litellm/*`).
+provider registered via a Platform config repo, e.g. a custom gateway id).
 
 `e2e/tests/session-lifecycle.spec.ts` was updated to use `opencode/big-pickle` and to assert on frame
 arrival/type only (`message.part.updated`), never specific response text — real model output is

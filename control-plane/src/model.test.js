@@ -8,8 +8,8 @@ import {
 
 describe('splitModel', () => {
   it('splits on the first slash only', () => {
-    expect(splitModel('litellm/a/b')).toEqual({
-      providerID: 'litellm',
+    expect(splitModel('opencode/a/b')).toEqual({
+      providerID: 'opencode',
       modelID: 'a/b',
     });
   });
@@ -17,12 +17,12 @@ describe('splitModel', () => {
 
 describe('isValidModelReference', () => {
   it.each([
-    ['litellm/x', true],
+    ['opencode/x', true],
     ['x', false],
     ['/x', false],
     ['x/', false],
-    ['litellm/a/b', true],
-    ['litellm/not-in-allowlist', true],
+    ['opencode/a/b', true],
+    ['opencode/not-in-allowlist', true],
   ])('%s -> %s', (model, expected) => {
     expect(isValidModelReference(model)).toBe(expected);
   });

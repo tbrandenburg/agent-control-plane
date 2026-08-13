@@ -16,7 +16,7 @@
 - **Model-resolution / config-composition changes require a real E2E gate in the same step.**
   Any implementation step whose `Changes` touch model-resolution or config-composition logic
   (non-exhaustive examples: `OPENCODE_CONFIG_CONTENT` composition, bootstrap/clone wiring,
-  provider defaults, `LITELLM_*`/`OPENCODE_*` env vars passed into the sandbox container) **must**
+  provider defaults, `OPENCODE_*` env vars passed into the sandbox container) **must**
   include a real, executed end-to-end prompt check in its own `Validation` → `Commands` — at
   minimum, a single real prompt against a real, already-passing session scenario (e.g.
   `opencode/big-pickle`, per step `00602`) proving a model still resolves. This check is required
@@ -204,13 +204,13 @@
   `00601`, matching this repo's own `00201`/`00202`/`00301`/`00401` pattern) independent of whether
   `make e2e` itself is green. **Do not confuse this with a model-provider/E2E-blocking issue** — see
   the next bullet for how that part is actually resolved.
-- `litellm/stub-model` (Phase 1's e2e fixture model) requires a provider block only a real Platform
-  config repo supplies, which — per the bullet above — nothing in this stack ever clones; a live E2E
-  run against it produces `session.error` / `"ProviderModelNotFoundError: ... Model not found:
-  litellm/stub-model"`. The fix is not to build that wiring for E2E purposes: `opencode/big-pickle`
-  (and opencode's other bundled `*-free` models) is a real, free, zero-credential model `opencode`
-  resolves natively — no `auth.json` entry, no Platform-config-repo provider block, no
-  `LITELLM_BASE_URL`/API key required — confirmed live by running the sandbox image standalone with
+- The Phase 1 e2e fixture model (a hypothetical gateway-routed model requiring a provider block only
+  a real Platform config repo supplies, which — per the bullet above — nothing in this stack ever
+  clones) produces `session.error` / `"ProviderModelNotFoundError: ... Model not found: ..."`. The
+  fix is not to build that wiring for E2E purposes: `opencode/big-pickle` (and opencode's other
+  bundled `*-free` models) is a real, free, zero-credential model `opencode` resolves natively — no
+  `auth.json` entry, no Platform-config-repo provider block, no gateway base URL/API key
+  required — confirmed live by running the sandbox image standalone with
   only `OPENCODE_CONFIG_CONTENT='{"model":"opencode/big-pickle","autoupdate":false}'` and driving a
   full real turn through `opencode serve`'s own API. Use `opencode/big-pickle` (or any other
   zero-config bundled model — it is one convenient E2E-fixture option, not a pinned requirement) for

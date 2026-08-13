@@ -31,7 +31,7 @@ function seedSession(db, overrides = {}) {
     title: 'Test session',
     repo_owner: 'acme',
     repo_name: 'widgets',
-    model: 'litellm/claude-sonnet',
+    model: 'opencode/big-pickle',
     reasoning_effort: 'medium',
     status: 'active',
     container_name: null,

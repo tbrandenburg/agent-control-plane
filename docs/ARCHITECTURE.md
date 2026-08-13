@@ -52,13 +52,13 @@ sandbox container ── bridge.js (Node, small HTTP server + SSE relay) ── 
    ▼
 sandbox-proxy container (Caddy) ── bridges sandbox-net + egress-net, injects Authorization headers
    ▼
-Real GitHub / LiteLLM endpoints (egress-net → host internet)
+Real GitHub / model gateway endpoints (egress-net → host internet)
 ```
 
 **Secret-custody boundary:** the sandbox container is structurally incapable of reaching the internet
 (`internal: true` Docker network has no NAT/default route — live-verified: `curl` from inside such a
 network to `example.com` reports `UNREACHABLE`). It therefore never needs to hold a GitHub token or
-LLM API key. Only two places ever hold secrets: the `sandbox-proxy` container's env (GitHub/LiteLLM
+LLM API key. Only two places ever hold secrets: the `sandbox-proxy` container's env (GitHub/model-gateway
 credentials, injected into outbound requests via Caddy `header_up`), and the control plane's own env
 (the GitHub token used for cloning, `OIDC_CLIENT_SECRET`, `GITHUB_WEBHOOK_SECRET`).
 Cloned repo/config directories also have any embedded credential stripped (`git remote set-url origin
@@ -73,7 +73,7 @@ the filesystem path, not just the network path.
 |---|---|---|
 | `control-plane/` (Fastify + SQLite) | Session CRUD, auth (OAuth2 + WS tokens + dashboard cookie), bootstrap orchestration, sandbox lifecycle, WebSocket relay/broadcast, webhook ingestion, reaping, serving the dashboard SPA's static assets | Understanding OpenCode's conversation model beyond relaying events; merging opencode config (opencode does that natively) |
 | `sandbox/bridge.js` | Runs alongside `opencode serve` inside each sandbox; exposes `POST /prompt` / `POST /stop`; relays `opencode serve`'s SSE stream to the control plane; owns the 15-minute idle watchdog; persists/restores `opencode`'s own session id across restarts | Queueing or acknowledging commands (no queue exists); holding any external secret |
-| `proxy/` (Caddy — **declared deviation from a custom TLS-terminating MITM forward proxy**, see §12/§13) | The **only** container attached to both `sandbox-net` and `egress-net`; injects `Authorization` headers for GitHub/LiteLLM; routes by path prefix | Any application logic — pure declarative reverse-proxy config; CONNECT-tunnel MITM semantics (not reimplemented, see §13) |
+| `proxy/` (Caddy — **declared deviation from a custom TLS-terminating MITM forward proxy**, see §12/§13) | The **only** container attached to both `sandbox-net` and `egress-net`; injects `Authorization` headers for GitHub/model-gateway; routes by path prefix | Any application logic — pure declarative reverse-proxy config; CONNECT-tunnel MITM semantics (not reimplemented, see §13) |
 | `opencode serve` (vendored, not authored) | Durable conversation state (own local SQLite at `~/.local/share/opencode/opencode.db`), model invocation, tool execution, SSE event bus | Control-plane bookkeeping (session rows, tokens, continuation metadata) — entirely separate persistence layer |
 
 ---
@@ -162,10 +162,10 @@ routes (see below) — full endpoint parity with the source doc.
 
 ### `GET /api/models`
 
-**Confirmed: static list, by design — not a live LiteLLM query.** The real system ("codefleet") uses a
-hand-curated static list because it currently doesn't expose *every* model LiteLLM knows about — a
+**Confirmed: static list, by design — not a live model-gateway query.** The real system ("codefleet") uses a
+hand-curated static list because it currently doesn't expose *every* model a gateway knows about — a
 deliberate allowlist/curation concern (which models are approved/supported for this platform), not a
-staleness problem a live query would fix. Reverting the earlier "live-query LiteLLM" idea from this
+staleness problem a live query would fix. Reverting the earlier "live-query the gateway" idea from this
 design — it solved a problem that doesn't exist (keeping the list fresh) at the cost of one that does
 exist here (only exposing an intentionally-curated subset):
 
@@ -175,7 +175,7 @@ exist here (only exposing an intentionally-curated subset):
 // registered in the Platform config repo's opencode.json (see §8's declared correction) — the
 // allowlist's job is curation, not enumerating which gateways exist.
 const MODEL_ALLOWLIST = [
-  { id: 'litellm/eu.anthropic.claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
+  { id: 'opencode/big-pickle', name: 'Claude Sonnet 4.6' },
   // { id: 'openai-direct/gpt-5', name: 'GPT-5 (direct)' },  — a second, differently-gatewayed
   // example entry; not implemented, illustrating that the shape already supports it today.
   // ... hand-maintained, one entry per approved model
@@ -196,7 +196,7 @@ fastify.get('/api/models', async () => ({ models: MODEL_ALLOWLIST }))
 **The allowlist is UI-only, not a validation gate (confirmed):** `POST /api/sessions`,
 `POST /api/sessions/:id/prompt`, and the WS `prompt` message validate `model` against **syntax only**
 (`provider/model` shape, first-`/`-is-separator rule, `400 INVALID_MODEL_REFERENCE` on mismatch) — they
-do **not** check membership in `MODEL_ALLOWLIST`. A well-formed `litellm/<anything>` string is accepted
+do **not** check membership in `MODEL_ALLOWLIST`. A well-formed `opencode/<anything>` string is accepted
 even if it's not in the dropdown list; the allowlist exists purely to populate `GET /api/models` for
 UI/discovery. This matches confirmed production behavior exactly — **no membership-check code should be
 added here**, since that would be a stricter validation than what's actually deployed.
@@ -357,7 +357,7 @@ implied: (a) it is not the chain's *highest* layer in general (steps 7-8 could s
 managed macOS deployment, though those don't apply here), and (b) what it actually needs to carry is
 narrower than a full provider block.
 
-**Declared correction (superseding the single-`provider.litellm`-block framing previously here):**
+**Declared correction (superseding the single-`provider.<gateway>`-block framing previously here):**
 per `docs/archive/ai-coding-agent-doc.md`'s own "OpenCode config layering" chapter, the full provider
 catalog — arbitrary numbers of gateways/providers, each with its own `npm` package and `baseURL` — is
 **Platform config repo territory** (step 2 above), not control-plane-injected config. `model` is
@@ -373,7 +373,7 @@ What `OPENCODE_CONFIG_CONTENT` (step 6) **actually** must own — narrowly, and 
 
 ```jsonc
 {
-  "model": "litellm/eu.anthropic.claude-sonnet-4-6",
+  "model": "opencode/big-pickle",
   "autoupdate": false
 }
 ```
@@ -773,12 +773,12 @@ services:
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       GITHUB_URL: ${GITHUB_URL}   # api.github.com, a GHDR tenant host, or a GHES host — same
                                    # env var pattern as production's own GITHUB_URL config toggle
-      # One `handle_path`/credential-injection block per configured model gateway — LiteLLM is the
+      # One `handle_path`/credential-injection block per configured model gateway — one such gateway is the
       # example/default below, not the only supported shape (§8's declared correction). Additional
       # gateways registered in the Platform config repo's opencode.json would each need their own
       # route + credential env var here, since Caddy is the sole egress bridge (§3) regardless of
       # which layer defines the provider's existence.
-      MODEL_GATEWAY_API_KEY: ${MODEL_GATEWAY_API_KEY:-${LITELLM_API_KEY}}
+      MODEL_GATEWAY_API_KEY: ${MODEL_GATEWAY_API_KEY:-${MODEL_GATEWAY_API_KEY}}
 
   # sandbox containers: spawned dynamically, always sandbox-net ONLY, never the docker socket,
   # each with a per-session INTERNAL_TOKEN minted at spawn time.
@@ -792,12 +792,12 @@ services:
       header_up Host {env.GITHUB_URL}
     }
   }
-  # One block per configured model gateway. LiteLLM shown here as the default/example — see §8's
+  # One block per configured model gateway. A generic gateway is shown here as the default/example — see §8's
   # declared correction: the Platform config repo's opencode.json may register additional gateways,
   # each needing its own `handle_path` + credential env var, since sandboxes can never reach the
   # internet directly (§3/§12) regardless of which config layer names the provider.
   handle_path /model-gateway/* {
-    reverse_proxy https://litellm.internal.example.com {
+    reverse_proxy https://gateway.internal.example.com {
       header_up Authorization "Bearer {env.MODEL_GATEWAY_API_KEY}"
     }
   }
@@ -838,7 +838,7 @@ last-active age, to avoid removing an actively-running session's volume/containe
 | Python supervisor in sandbox | Node.js bridge (~60-80 LOC) | Shares language/types with control plane |
 | PVC, K8s reattach semantics | Named Docker volume + hourly reaper | Direct, smaller analog; **confirmed** production also retains the PVC via its own expiry/reaper management, not Job ownership/Job TTL — same shape, not just an assumption |
 | GitHub webhook signature lib | Raw `node:crypto` HMAC compare | No library needed for HMAC-SHA256 |
-| Open-ended `GET /models` provider catalog | Static, hand-curated allowlist (`config.js`), **UI-only — not a server-side validation gate** | **Confirmed** — production uses a static list too (not every LiteLLM-known model is exposed/approved) and validates `model` fields on syntax alone, never catalog membership; matched exactly, not narrowed further |
+| Open-ended `GET /models` provider catalog | Static, hand-curated allowlist (`config.js`), **UI-only — not a server-side validation gate** | **Confirmed** — production uses a static list too (not every gateway-known model is exposed/approved) and validates `model` fields on syntax alone, never catalog membership; matched exactly, not narrowed further |
 | Container log aggregation to OpenSearch (dashboard's "Open full logs in OpenSearch" link) | **Not built** — `docker logs --tail N` only | No log-aggregation stack in a single-Docker-host design; acceptable loss of a deep-link convenience feature, not a functional gap (raw logs are still fully retrievable via `sandbox/logs`) |
 | `continuationReason: workspace_origin_mismatch` | **Not reachable, omitted from enum** | No org-wide repo-access model to mismatch against |
 | `additionalRepos` / `readOrgRepos` session-creation fields | **Not built — permanent deviation** | Multi-repo/org-wide read grants are real complexity (extra clone/mount/token-scoping logic) with no need on a single-tenant host where the operator already controls repo access directly |
@@ -869,7 +869,7 @@ technology, and its task, cross-referenced against `ai-coding-agent-doc.md`'s ow
 | Credential injection | Caddy (`sandbox-proxy` container, path-prefix reverse proxy) | Declared deviation from production's custom TLS-terminating MITM forward proxy — same secret-custody outcome, far less code (§12, §13) |
 | Sandbox bridge | Node.js (`sandbox/bridge.js`, small inbound HTTP server) | Direct analog of the Python supervisor, but push not poll — control plane calls it synchronously over `sandbox-net`; owns idle watchdog, SSE relay, `opencode_session_id` reporting (§8) |
 | Coding agent runtime | `opencode serve` (HTTP + SSE, confirmed match to production) | Model invocation, tool execution, durable local conversation state (§8) |
-| Model gateway(s) | **Declared deviation (superseding earlier LiteLLM-only framing):** 0..N operator/team-configured gateways via the Platform config repo's opencode.json, resolved by opencode's native config layering — not enumerated in control-plane code. LiteLLM remains the default/example, and the control plane's own non-negotiable layer may still inject one fallback gateway for environments with no Platform config repo yet (open design question, §8) | `providerID/modelID` (`splitModel`, §8) already supports arbitrary provider ids; the control plane only ever overwrites `model`, never a provider catalog, in its non-negotiable `OPENCODE_CONFIG_CONTENT` layer |
+| Model gateway(s) | **Declared deviation (superseding earlier single-gateway framing):** 0..N operator/team-configured gateways via the Platform config repo's opencode.json, resolved by opencode's native config layering — not enumerated in control-plane code. A generic model gateway remains the default/example, and the control plane's own non-negotiable layer may still inject one fallback gateway for environments with no Platform config repo yet (open design question, §8) | `providerID/modelID` (`splitModel`, §8) already supports arbitrary provider ids; the control plane only ever overwrites `model`, never a provider catalog, in its non-negotiable `OPENCODE_CONFIG_CONTENT` layer |
 | Model listing | Static, hand-curated allowlist (`config.js`) — confirmed to match production exactly | `GET /api/models` is UI-only; session/prompt endpoints validate `provider/model` syntax only, never catalog membership (§5, §13) |
 | Config layering | `opencode`'s native config-precedence resolution, plus authored bootstrap composition logic | No custom merge-*algorithm*; real authored code clones/sparse-checks-out/SHA-pins and mounts platform/team/repo trees, and the non-negotiable `OPENCODE_CONFIG_CONTENT` layer overwrites model selection at runtime (§8) |
 | Persistent workspace | Named Docker volume (per session) + hourly reaper (`setInterval`) | Direct analog of PVC + reaper-driven retention (§7, §12, §13); `opencode_session_id` lives in the control-plane DB, not solely on the volume |
@@ -883,7 +883,7 @@ technology, and its task, cross-referenced against `ai-coding-agent-doc.md`'s ow
 **Framing:** every component is either a direct, smaller-footprint analog of its production counterpart
 (Docker vs. K8s, SQLite vs. Postgres+Drizzle, named volume vs. PVC, Caddy vs. custom MITM proxy,
 vanilla JS vs. React/Vite/Tailwind), or literally the same technology/library carried over unchanged
-(`opencode serve`, LiteLLM, `openid-client` + introspection auth, the GitHub webhook/trust logic, the
+(`opencode serve`, the model gateway, `openid-client` + introspection auth, the GitHub webhook/trust logic, the
 config-layering system).
 
 ---

@@ -32,7 +32,7 @@ describe('client request()', () => {
       title: 'Test',
       repoOwner: 'acme',
       repoName: 'widgets',
-      model: 'litellm/model',
+      model: 'opencode/big-pickle',
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);

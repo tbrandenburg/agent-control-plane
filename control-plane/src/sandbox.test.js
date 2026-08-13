@@ -55,14 +55,12 @@ describe('run', () => {
       SANDBOX_IMAGE: 'agent-sandbox:local',
       SANDBOX_NETWORK: 'my-project_egress-net',
       CONTROL_PLANE_URL: 'http://control-plane:3000',
-      LITELLM_BASE_URL: 'http://litellm:4000',
-      LITELLM_API_KEY: 'secret-key',
     };
 
     const result = await run(
       {
         id: 'sess-1',
-        model: 'litellm/eu.anthropic.claude-sonnet-4-6',
+        model: 'opencode/big-pickle',
         targetDir: '/host/workspace/sess-1/target',
         platformConfigDir: '/host/workspace/sess-1/platform',
       },
@@ -96,13 +94,9 @@ describe('run', () => {
       'CONTROL_PLANE_URL=http://control-plane:3000',
       '-e',
       `OPENCODE_CONFIG_CONTENT=${JSON.stringify({
-        model: 'litellm/eu.anthropic.claude-sonnet-4-6',
+        model: 'opencode/big-pickle',
         autoupdate: false,
       })}`,
-      '-e',
-      'LITELLM_BASE_URL=http://litellm:4000',
-      '-e',
-      'LITELLM_API_KEY=secret-key',
       'agent-sandbox:local',
     ]);
   });
@@ -115,7 +109,7 @@ describe('run', () => {
     await run(
       {
         id: 's',
-        model: 'litellm/x',
+        model: 'opencode/x',
         targetDir: '/host/target',
         platformConfigDir: '/host/platform',
         teamConfigDir: '/host/team',
@@ -137,7 +131,7 @@ describe('run', () => {
     await run(
       {
         id: 's',
-        model: 'litellm/x',
+        model: 'opencode/x',
         targetDir: '/host/target',
         platformConfigDir: '/host/platform',
       },
@@ -148,11 +142,7 @@ describe('run', () => {
     expect(args[args.indexOf('--network') + 1]).toBe('egress-net');
   });
 
-  it.each([
-    'litellm/eu.anthropic.claude-sonnet-4-6',
-    'anthropic/claude-opus-4',
-    'openai/gpt-5',
-  ])(
+  it.each(['opencode/big-pickle', 'anthropic/claude-opus-4', 'openai/gpt-5'])(
     'composes OPENCODE_CONFIG_CONTENT with exactly model + autoupdate, nothing provider-shaped, for %s',
     async (model) => {
       vi.mocked(childProcess.spawn).mockReturnValue(
@@ -180,7 +170,7 @@ describe('run', () => {
   );
 
   it(
-    'composes the same narrowed OPENCODE_CONFIG_CONTENT shape regardless of LITELLM_* env vars ' +
+    'composes the same narrowed OPENCODE_CONFIG_CONTENT shape regardless of unrelated env vars ' +
       '(Option C: no gateway/provider default is ever injected by the control plane)',
     async () => {
       vi.mocked(childProcess.spawn).mockReturnValue(
@@ -190,14 +180,13 @@ describe('run', () => {
       await run(
         {
           id: 's',
-          model: 'litellm/x',
+          model: 'opencode/x',
           targetDir: '/host/target',
           platformConfigDir: '/host/platform',
         },
         {
           SANDBOX_IMAGE: 'img',
-          LITELLM_BASE_URL: 'http://litellm:4000',
-          LITELLM_API_KEY: 'secret-key',
+          UNRELATED_ENV_VAR: 'some-value',
         },
       );
 
@@ -206,7 +195,7 @@ describe('run', () => {
         .find((arg) => arg.startsWith('OPENCODE_CONFIG_CONTENT='))
         .slice('OPENCODE_CONFIG_CONTENT='.length);
       expect(JSON.parse(raw)).toEqual({
-        model: 'litellm/x',
+        model: 'opencode/x',
         autoupdate: false,
       });
     },
@@ -221,7 +210,7 @@ describe('run', () => {
       run(
         {
           id: 's',
-          model: 'litellm/x',
+          model: 'opencode/x',
           targetDir: '/host/target',
           platformConfigDir: '/host/platform',
         },
@@ -235,7 +224,7 @@ describe('run', () => {
       run(
         {
           id: 's',
-          model: 'litellm/x',
+          model: 'opencode/x',
           targetDir: '/host/target',
           platformConfigDir: '/host/platform',
         },
@@ -248,7 +237,7 @@ describe('run', () => {
   it('throws without spawning when session.targetDir is missing', async () => {
     await expect(
       run(
-        { id: 's', model: 'litellm/x', platformConfigDir: '/host/platform' },
+        { id: 's', model: 'opencode/x', platformConfigDir: '/host/platform' },
         { SANDBOX_IMAGE: 'img' },
       ),
     ).rejects.toThrow('targetDir');
@@ -258,7 +247,7 @@ describe('run', () => {
   it('throws without spawning when session.platformConfigDir is missing', async () => {
     await expect(
       run(
-        { id: 's', model: 'litellm/x', targetDir: '/host/target' },
+        { id: 's', model: 'opencode/x', targetDir: '/host/target' },
         { SANDBOX_IMAGE: 'img' },
       ),
     ).rejects.toThrow('platformConfigDir');
@@ -614,7 +603,7 @@ describe.runIf(sandboxImageExists())('real Docker integration', () => {
     const started = await run(
       {
         id: 'integration-test',
-        model: 'litellm/x',
+        model: 'opencode/x',
         targetDir: process.cwd(),
         platformConfigDir: process.cwd(),
       },

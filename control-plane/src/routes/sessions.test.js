@@ -76,7 +76,7 @@ function seedSession(db, overrides = {}) {
     title: 'Test session',
     repo_owner: 'acme',
     repo_name: 'widgets',
-    model: 'litellm/claude-sonnet',
+    model: 'opencode/big-pickle',
     reasoning_effort: 'medium',
     status: 'active',
     container_name: null,
@@ -393,7 +393,7 @@ describe('POST /api/sessions', () => {
         title: 'My session',
         repoOwner: 'acme',
         repoName: 'widgets',
-        model: 'litellm/claude-sonnet',
+        model: 'opencode/big-pickle',
       },
     });
 
@@ -438,7 +438,7 @@ describe('POST /api/sessions', () => {
         title: 'My session',
         repoOwner: 'acme',
         repoName: 'widgets',
-        model: 'litellm/claude-sonnet',
+        model: 'opencode/big-pickle',
       },
     });
 
@@ -447,7 +447,7 @@ describe('POST /api/sessions', () => {
     await flushAsyncSpawn();
 
     expect(sandbox.run).toHaveBeenCalledWith(
-      expect.objectContaining({ id: body.id, model: 'litellm/claude-sonnet' }),
+      expect.objectContaining({ id: body.id, model: 'opencode/big-pickle' }),
     );
     expect(sandbox.waitForHealth).toHaveBeenCalledWith('sandbox-x');
 
@@ -478,7 +478,7 @@ describe('POST /api/sessions', () => {
         title: 'My session',
         repoOwner: 'acme',
         repoName: 'widgets',
-        model: 'litellm/not-in-allowlist',
+        model: 'opencode/not-in-allowlist',
       },
     });
 
@@ -519,7 +519,7 @@ describe('POST /api/sessions', () => {
         title: 'My session',
         repoOwner: '../../etc',
         repoName: 'widgets',
-        model: 'litellm/claude-sonnet',
+        model: 'opencode/big-pickle',
       },
     });
 
@@ -540,7 +540,7 @@ describe('POST /api/sessions', () => {
         title: 'My session',
         repoOwner: 'acme',
         repoName: 'weird name!!',
-        model: 'litellm/claude-sonnet',
+        model: 'opencode/big-pickle',
       },
     });
 
@@ -561,7 +561,7 @@ describe('POST /api/sessions', () => {
         title: 'x'.repeat(201),
         repoOwner: 'acme',
         repoName: 'widgets',
-        model: 'litellm/claude-sonnet',
+        model: 'opencode/big-pickle',
       },
     });
 
@@ -583,7 +583,7 @@ describe('POST /api/sessions', () => {
         title: 'My session',
         repoOwner: 'acme',
         repoName: 'widgets',
-        model: 'litellm/claude-sonnet',
+        model: 'opencode/big-pickle',
       },
     });
 
@@ -613,7 +613,7 @@ describe('POST /api/sessions', () => {
         title: 'My session',
         repoOwner: 'this-org-should-not-exist-zzz',
         repoName: 'nope',
-        model: 'litellm/claude-sonnet',
+        model: 'opencode/big-pickle',
       },
     });
 
@@ -646,7 +646,7 @@ describe('POST /api/sessions', () => {
         title: 'My session',
         repoOwner: 'acme',
         repoName: 'widgets',
-        model: 'litellm/claude-sonnet',
+        model: 'opencode/big-pickle',
         teamConfigRepo: 'acme/team-config',
       },
     });
