@@ -24,19 +24,25 @@ import { cn } from '@/lib/utils';
 
 type Role = 'user' | 'assistant';
 
+/**
+ * Real opencode SSE frame shapes actually observed on the wire (verified live against
+ * `opencode/big-pickle`, not assumed from docs — see issue #16's follow-up fix):
+ * - `message.updated` carries the message's role at `properties.info.{id,role}` — this is the
+ *   *only* place role ever appears; individual `part`/`delta` frames never carry a role field.
+ * - `message.part.updated` carries a part's current (possibly empty/seed) text at
+ *   `properties.part.{id,messageID,text}`.
+ * - `message.part.delta` carries only an *incremental* text chunk at
+ *   `properties.{messageID,partID,delta}` — there is no `properties.part` on this frame type at
+ *   all, so it must be handled as its own distinct shape, not folded into the `part.text` case.
+ */
 interface ParsedFrame {
   type?: string;
   properties?: {
-    part?: {
-      id?: string;
-      messageID?: string;
-      text?: string;
-      type?: string;
-      role?: Role;
-    };
+    part?: { id?: string; messageID?: string; text?: string };
     info?: { id?: string; role?: Role };
-    role?: Role;
-    sessionID?: string;
+    messageID?: string;
+    partID?: string;
+    delta?: string;
   };
 }
 
@@ -61,57 +67,76 @@ function parsePayload(payload: string): ParsedFrame | null {
   }
 }
 
-function frameRole(frame: ParsedFrame): Role | undefined {
-  return (
-    frame.properties?.part?.role ??
-    frame.properties?.info?.role ??
-    frame.properties?.role
-  );
-}
-
 /**
  * Splits raw event rows into conversational message bubbles (grouped/coalesced by message id,
- * with delta chunks merged into one growing text) and hidden lifecycle rows (no visible content).
+ * with delta chunks appended onto a running per-message text) and hidden lifecycle rows (no
+ * visible content). Two passes: first collect every message's role (from `message.updated`) and
+ * every part's owning message id (from `message.part.updated`), then build/append text in event
+ * order using that lookup — a delta can otherwise arrive referencing a `partID` whose owning
+ * message was only established moments earlier by a `part.updated` frame.
  */
 function toEntries(events: EventRecord[]): {
   messages: MessageEntry[];
   raw: RawEntry[];
 } {
+  const roleByMessage = new Map<string, Role>();
+  const messageByPart = new Map<string, string>();
+
+  for (const event of events) {
+    const frame = parsePayload(event.payload);
+    const info = frame?.properties?.info;
+    if (info?.id && info.role) roleByMessage.set(info.id, info.role);
+    const part = frame?.properties?.part;
+    if (part?.id && part.messageID) messageByPart.set(part.id, part.messageID);
+  }
+
   const messages: MessageEntry[] = [];
   const groupIndex = new Map<string, number>();
   const raw: RawEntry[] = [];
 
-  for (const event of events) {
-    const frame = parsePayload(event.payload);
-    const text = frame?.properties?.part?.text;
-    const groupId =
-      frame?.properties?.part?.messageID ?? frame?.properties?.part?.id;
-    const role = frameRole(frame ?? {});
-
-    if (typeof text !== 'string' || !groupId) {
-      raw.push({
-        key: String(event.id),
-        timestamp: event.timestamp,
-        type: frame?.type ?? 'event',
-      });
-      continue;
-    }
-
+  const upsert = (groupId: string, text: string, timestamp: string) => {
     const existingIndex = groupIndex.get(groupId);
+    const role = roleByMessage.get(groupId) ?? 'assistant';
     if (existingIndex !== undefined) {
       const existing = messages[existingIndex];
       existing.text = text;
-      existing.timestamp = event.timestamp;
-      if (role) existing.role = role;
+      existing.timestamp = timestamp;
+      existing.role = role;
+      return;
+    }
+    groupIndex.set(groupId, messages.length);
+    messages.push({ key: groupId, timestamp, text, role });
+  };
+
+  for (const event of events) {
+    const frame = parsePayload(event.payload);
+    const part = frame?.properties?.part;
+
+    if (typeof part?.text === 'string' && part.messageID) {
+      upsert(part.messageID, part.text, event.timestamp);
       continue;
     }
 
-    groupIndex.set(groupId, messages.length);
-    messages.push({
-      key: groupId,
+    const delta = frame?.properties?.delta;
+    if (typeof delta === 'string') {
+      const partID = frame?.properties?.partID;
+      const messageID =
+        frame?.properties?.messageID ??
+        (partID ? messageByPart.get(partID) : undefined) ??
+        partID;
+      if (messageID) {
+        const existingIndex = groupIndex.get(messageID);
+        const priorText =
+          existingIndex !== undefined ? messages[existingIndex].text : '';
+        upsert(messageID, priorText + delta, event.timestamp);
+        continue;
+      }
+    }
+
+    raw.push({
+      key: String(event.id),
       timestamp: event.timestamp,
-      text,
-      role: role ?? 'assistant',
+      type: frame?.type ?? 'event',
     });
   }
 

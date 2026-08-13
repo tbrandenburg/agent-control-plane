@@ -21,14 +21,14 @@ describe('Transcript', () => {
         id: 1,
         payload: JSON.stringify({
           type: 'message.part.delta',
-          properties: { part: { id: 'p1', text: 'Hel' } },
+          properties: { messageID: 'm1', partID: 'p1', delta: 'Hel' },
         }),
       }),
       event({
         id: 2,
         payload: JSON.stringify({
           type: 'message.part.delta',
-          properties: { part: { id: 'p2', text: 'World' } },
+          properties: { messageID: 'm2', partID: 'p2', delta: 'World' },
         }),
       }),
     ];
@@ -63,23 +63,21 @@ describe('Transcript', () => {
         id: 1,
         payload: JSON.stringify({
           type: 'message.part.delta',
-          properties: { part: { id: 'p1', messageID: 'm1', text: 'Hel' } },
+          properties: { messageID: 'm1', partID: 'p1', delta: 'Hel' },
         }),
       }),
       event({
         id: 2,
         payload: JSON.stringify({
           type: 'message.part.delta',
-          properties: { part: { id: 'p1', messageID: 'm1', text: 'Hello' } },
+          properties: { messageID: 'm1', partID: 'p1', delta: 'lo' },
         }),
       }),
       event({
         id: 3,
         payload: JSON.stringify({
           type: 'message.part.delta',
-          properties: {
-            part: { id: 'p1', messageID: 'm1', text: 'Hello world' },
-          },
+          properties: { messageID: 'm1', partID: 'p1', delta: ' world' },
         }),
       }),
     ];
@@ -104,7 +102,7 @@ describe('Transcript', () => {
         id: 3,
         payload: JSON.stringify({
           type: 'message.part.delta',
-          properties: { part: { id: 'p1', messageID: 'm1', text: 'hi' } },
+          properties: { messageID: 'm1', partID: 'p1', delta: 'hi' },
         }),
       }),
     ];
@@ -126,22 +124,31 @@ describe('Transcript', () => {
       event({
         id: 1,
         payload: JSON.stringify({
-          type: 'message.part.updated',
-          properties: {
-            part: {
-              id: 'u1',
-              messageID: 'mu',
-              text: 'What is 2+2?',
-              role: 'user',
-            },
-          },
+          type: 'message.updated',
+          properties: { info: { id: 'mu', role: 'user' } },
         }),
       }),
       event({
         id: 2,
         payload: JSON.stringify({
+          type: 'message.part.updated',
+          properties: {
+            part: { id: 'u1', messageID: 'mu', text: 'What is 2+2?' },
+          },
+        }),
+      }),
+      event({
+        id: 3,
+        payload: JSON.stringify({
+          type: 'message.updated',
+          properties: { info: { id: 'ma', role: 'assistant' } },
+        }),
+      }),
+      event({
+        id: 4,
+        payload: JSON.stringify({
           type: 'message.part.delta',
-          properties: { part: { id: 'a1', messageID: 'ma', text: '4' } },
+          properties: { messageID: 'ma', partID: 'a1', delta: '4' },
         }),
       }),
     ];
