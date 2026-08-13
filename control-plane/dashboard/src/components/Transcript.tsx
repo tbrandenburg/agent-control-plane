@@ -7,17 +7,50 @@
  *
  * The socket itself is owned by `SessionDetail` (lifted so its header's connection indicator and
  * this body share one live connection instead of opening two) and passed down as props.
+ *
+ * Presentation layer (issue #16): pure lifecycle frames (`session.updated`, `session.status`,
+ * `session.diff`, `session.idle`, and any `message.updated`/`message.part.updated` carrying no
+ * visible text) are hidden from the default view behind a "Show raw events" toggle, since they
+ * carry no user-facing conversational content. Text-bearing frames are grouped by message
+ * (`messageID`, falling back to the part `id` when absent) so streaming deltas coalesce into one
+ * growing bubble, and are labelled by role (`user` vs the default `assistant`) when the
+ * underlying frame exposes one.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { EventRecord } from '@/api/client';
+import { Button } from '@/components/ui/button';
 import type { SocketStatus } from '@/hooks/useSessionSocket';
+import { cn } from '@/lib/utils';
+
+type Role = 'user' | 'assistant';
 
 interface ParsedFrame {
   type?: string;
   properties?: {
-    part?: { id?: string; text?: string; type?: string };
+    part?: {
+      id?: string;
+      messageID?: string;
+      text?: string;
+      type?: string;
+      role?: Role;
+    };
+    info?: { id?: string; role?: Role };
+    role?: Role;
     sessionID?: string;
   };
+}
+
+interface MessageEntry {
+  key: string;
+  timestamp: string;
+  text: string;
+  role: Role;
+}
+
+interface RawEntry {
+  key: string;
+  timestamp: string;
+  type: string;
 }
 
 function parsePayload(payload: string): ParsedFrame | null {
@@ -28,47 +61,61 @@ function parsePayload(payload: string): ParsedFrame | null {
   }
 }
 
+function frameRole(frame: ParsedFrame): Role | undefined {
+  return (
+    frame.properties?.part?.role ??
+    frame.properties?.info?.role ??
+    frame.properties?.role
+  );
+}
+
 /**
- * Reduces raw event rows into display entries, merging consecutive `message.part.delta` frames
- * for the same `part.id` into one growing line of text.
+ * Splits raw event rows into conversational message bubbles (grouped/coalesced by message id,
+ * with delta chunks merged into one growing text) and hidden lifecycle rows (no visible content).
  */
-function toEntries(
-  events: EventRecord[],
-): { key: string; timestamp: string; text: string }[] {
-  const entries: {
-    key: string;
-    timestamp: string;
-    text: string;
-    partId?: string;
-  }[] = [];
+function toEntries(events: EventRecord[]): {
+  messages: MessageEntry[];
+  raw: RawEntry[];
+} {
+  const messages: MessageEntry[] = [];
+  const groupIndex = new Map<string, number>();
+  const raw: RawEntry[] = [];
+
   for (const event of events) {
     const frame = parsePayload(event.payload);
     const text = frame?.properties?.part?.text;
-    const partId = frame?.properties?.part?.id;
-    const isDelta =
-      frame?.type === 'message.part.delta' ||
-      frame?.type === 'message.part.updated';
+    const groupId =
+      frame?.properties?.part?.messageID ?? frame?.properties?.part?.id;
+    const role = frameRole(frame ?? {});
 
-    const last = entries.at(-1);
-    if (
-      isDelta &&
-      typeof text === 'string' &&
-      partId &&
-      last?.partId === partId
-    ) {
-      last.text = text;
-      last.timestamp = event.timestamp;
+    if (typeof text !== 'string' || !groupId) {
+      raw.push({
+        key: String(event.id),
+        timestamp: event.timestamp,
+        type: frame?.type ?? 'event',
+      });
       continue;
     }
-    entries.push({
-      key: String(event.id),
+
+    const existingIndex = groupIndex.get(groupId);
+    if (existingIndex !== undefined) {
+      const existing = messages[existingIndex];
+      existing.text = text;
+      existing.timestamp = event.timestamp;
+      if (role) existing.role = role;
+      continue;
+    }
+
+    groupIndex.set(groupId, messages.length);
+    messages.push({
+      key: groupId,
       timestamp: event.timestamp,
-      text:
-        isDelta && typeof text === 'string' ? text : (frame?.type ?? 'event'),
-      partId: isDelta ? partId : undefined,
+      text,
+      role: role ?? 'assistant',
     });
   }
-  return entries;
+
+  return { messages, raw };
 }
 
 export function Transcript({
@@ -80,7 +127,8 @@ export function Transcript({
   status: SocketStatus;
   invalidToken: boolean;
 }) {
-  const entries = useMemo(() => toEntries(events), [events]);
+  const [showRaw, setShowRaw] = useState(false);
+  const { messages, raw } = useMemo(() => toEntries(events), [events]);
 
   return (
     <div>
@@ -94,19 +142,56 @@ export function Transcript({
           Reconnecting…
         </p>
       )}
-      {entries.length === 0 ? (
+      {messages.length === 0 ? (
         <p className="text-sm text-muted-foreground">No events yet.</p>
       ) : (
         <ul className="space-y-2" data-testid="transcript-entries">
-          {entries.map((entry) => (
-            <li key={entry.key} className="text-sm">
-              <span className="mr-2 text-xs text-muted-foreground">
-                {entry.timestamp}
-              </span>
+          {messages.map((entry) => (
+            <li
+              key={entry.key}
+              data-testid={`transcript-message-${entry.role}`}
+              className={cn(
+                'rounded-md border p-2 text-sm',
+                entry.role === 'user'
+                  ? 'bg-secondary/50 border-secondary'
+                  : 'bg-muted/40 border-transparent',
+              )}
+            >
+              <div className="mb-1 flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {entry.role === 'user' ? 'You' : 'Agent'}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {entry.timestamp}
+                </span>
+              </div>
               <span className="whitespace-pre-wrap">{entry.text}</span>
             </li>
           ))}
         </ul>
+      )}
+
+      {raw.length > 0 && (
+        <div className="mt-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowRaw((value) => !value)}
+          >
+            {showRaw ? 'Hide raw events' : `Show raw events (${raw.length})`}
+          </Button>
+          {showRaw && (
+            <ul className="mt-2 space-y-1" data-testid="transcript-raw-entries">
+              {raw.map((entry) => (
+                <li key={entry.key} className="text-xs text-muted-foreground">
+                  <span className="mr-2">{entry.timestamp}</span>
+                  <span>{entry.type}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   );
