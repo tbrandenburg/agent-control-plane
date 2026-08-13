@@ -115,3 +115,98 @@ describe('SessionList — pagination', () => {
     expect(offsetCall).toBeDefined();
   });
 });
+
+describe('SessionList — clear all sessions', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('does not call DELETE until the confirmation dialog is accepted', async () => {
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      if (init?.method === 'DELETE') {
+        return jsonResponse({ deleted: 1 });
+      }
+      return jsonResponse({ sessions: [makeSession('s1')] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderSessionList();
+
+    await waitFor(() =>
+      expect(screen.getByText('Session s1')).toBeInTheDocument(),
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /clear all sessions/i }),
+    );
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some((c) => c[1]?.method === 'DELETE')).toBe(
+      false,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some((c) => c[1]?.method === 'DELETE')).toBe(
+      false,
+    );
+  });
+
+  it('clears the session list on confirm and calls DELETE /api/sessions', async () => {
+    let deleted = false;
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      if (init?.method === 'DELETE') {
+        deleted = true;
+        return jsonResponse({ deleted: 1 });
+      }
+      return jsonResponse({ sessions: deleted ? [] : [makeSession('s1')] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderSessionList();
+
+    await waitFor(() =>
+      expect(screen.getByText('Session s1')).toBeInTheDocument(),
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /clear all sessions/i }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^clear all$/i }));
+
+    await waitFor(() =>
+      expect(screen.queryByText('Session s1')).not.toBeInTheDocument(),
+    );
+
+    const deleteCall = fetchMock.mock.calls.find(
+      (c) => c[1]?.method === 'DELETE',
+    );
+    expect(deleteCall?.[0]).toBe('/api/sessions');
+  });
+
+  it('shows an error message when the delete request fails', async () => {
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      if (init?.method === 'DELETE') {
+        return jsonResponse({ error: 'BOOM' }, 500);
+      }
+      return jsonResponse({ sessions: [makeSession('s1')] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderSessionList();
+
+    await waitFor(() =>
+      expect(screen.getByText('Session s1')).toBeInTheDocument(),
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /clear all sessions/i }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^clear all$/i }));
+
+    await waitFor(() => expect(screen.getByText('BOOM')).toBeInTheDocument());
+    expect(screen.getByText('Session s1')).toBeInTheDocument();
+  });
+});

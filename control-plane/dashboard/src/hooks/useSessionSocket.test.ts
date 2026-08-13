@@ -88,4 +88,45 @@ describe('useSessionSocket', () => {
     expect(result.current.status).toBe('closed');
     expect(FakeWebSocket.instances).toHaveLength(0);
   });
+
+  it('does not connect when shouldConnect is false', () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+
+    const { result } = renderHook(() => useSessionSocket('s1', 'tok-1', false));
+
+    expect(result.current.status).toBe('closed');
+    expect(FakeWebSocket.instances).toHaveLength(0);
+  });
+
+  it('closes the existing socket and stops reconnecting once shouldConnect flips to false', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+
+    const { result, rerender } = renderHook(
+      ({ shouldConnect }: { shouldConnect: boolean }) =>
+        useSessionSocket('s1', 'tok-1', shouldConnect),
+      { initialProps: { shouldConnect: true } },
+    );
+
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+
+    rerender({ shouldConnect: false });
+
+    await waitFor(() => expect(result.current.status).toBe('closed'));
+    // No new socket should have been opened after disabling.
+    expect(FakeWebSocket.instances).toHaveLength(1);
+  });
+
+  it('does not reconnect after a 4002 (session archived) close', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+
+    const { result } = renderHook(() => useSessionSocket('s1', 'tok-1'));
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+
+    FakeWebSocket.instances[0].emit('close', { code: 4002 });
+
+    await waitFor(() => expect(result.current.status).toBe('closed'));
+    // Give the reconnect delay a chance to fire, then confirm no new socket appeared.
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    expect(FakeWebSocket.instances).toHaveLength(1);
+  });
 });

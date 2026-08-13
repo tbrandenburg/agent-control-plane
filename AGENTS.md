@@ -428,3 +428,13 @@ Run `make help` for the full list. Most common:
   several independently-small parallel fixes (5 subagents landing ~10-25 lines each) even though no
   single fix looks like bloat in isolation — always re-run `make loc`/`node scripts/loc.mjs` once
   after integrating parallel work, not only after each subagent's own individual diff.
+- 2026-08-13: A subagent's own passing unit tests for a new bulk-operation endpoint (issue #29's
+  `DELETE /api/sessions`, which stops every session's container in a `for`/`await` loop) do not
+  catch a real, severe perf bug: each `docker stop` against an already-gone container takes ~5s to
+  fail, so a real integration run against ~20-100 stale rows made the endpoint hang 100+ seconds —
+  invisible in unit tests (which mock `sandbox.stop`) and never caught because the subagent's own
+  validation was unit-level only. Only surfaced via a real, unmocked E2E call against an isolated
+  `make dev-stack`. Fix: `Promise.allSettled(rows.map(...))` instead of a sequential loop. Rule:
+  any new endpoint that loops over N rows calling an external process (docker/git/network) per row
+  must be exercised with a realistic N in a real E2E pass — a unit test with mocked externals
+  cannot catch a purely time-based regression, no matter how many unit tests pass.

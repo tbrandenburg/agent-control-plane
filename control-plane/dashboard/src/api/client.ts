@@ -138,6 +138,10 @@ export function archiveSession(id: string): Promise<unknown> {
   });
 }
 
+export function deleteAllSessions(): Promise<{ deleted: number }> {
+  return request('/api/sessions', { method: 'DELETE' });
+}
+
 /**
  * The `wsToken` (ARCHITECTURE.md §6) is only ever returned once, from `POST /api/sessions`'s
  * response — this phase's backend has no rotation/hashing yet (a declared shortcut), so
@@ -214,6 +218,16 @@ export function useArchiveSession(sessionId: string) {
     mutationFn: () => archiveSession(sessionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
+    },
+  });
+}
+
+export function useDeleteAllSessions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteAllSessions,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
     },
   });
 }

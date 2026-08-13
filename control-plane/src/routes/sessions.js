@@ -3,8 +3,10 @@
  * `POST /api/sessions` (creates the row synchronously with `status = 'pending_bootstrap'` and kicks
  * off sandbox bootstrap asynchronously in the background, updating `status` to `'active'` or
  * `'pending_bootstrap-failed'` once bootstrap settles), `POST /api/sessions/:id/stop` (stops and
- * removes the sandbox container), `PATCH /api/sessions/:id` (updates mutable session fields), and
- * `POST /api/sessions/:id/prompt` (synchronous proxy to the bridge).
+ * removes the sandbox container), `PATCH /api/sessions/:id` (updates mutable session fields),
+ * `POST /api/sessions/:id/prompt` (synchronous proxy to the bridge), and `DELETE /api/sessions`
+ * (bulk cleanup: best-effort container teardown per session, then deletes all sessions + events
+ * rows).
  */
 
 import { randomUUID } from 'node:crypto';
@@ -16,7 +18,9 @@ import {
 } from '../model.js';
 import { promptSession } from '../prompt-session.js';
 import * as defaultSandbox from '../sandbox.js';
+import { isValidTransition } from '../session-state.js';
 import { spawnSandbox } from '../spawn-session.js';
+import { CLOSE_SESSION_ARCHIVED, closeSubscribersForSession } from './ws.js';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
@@ -385,10 +389,17 @@ export function registerSessionsRoutes(
       return { error: 'INVALID_STATUS' };
     }
 
-    const exists = db.prepare('SELECT 1 FROM sessions WHERE id = ?').get(id);
-    if (!exists) {
+    const currentRow = /** @type {{status: string}|undefined} */ (
+      db.prepare('SELECT status FROM sessions WHERE id = ?').get(id)
+    );
+    if (!currentRow) {
       reply.code(404);
       return { error: 'SESSION_NOT_FOUND' };
+    }
+
+    if (!isValidTransition(currentRow.status, status)) {
+      reply.code(409);
+      return { error: 'INVALID_TRANSITION' };
     }
 
     // Archive implies teardown: tear down the live container (if any) so archiving a
@@ -418,6 +429,10 @@ export function registerSessionsRoutes(
       "UPDATE sessions SET status = ?, updated_at = datetime('now') WHERE id = ?",
     ).run(status, id);
 
+    if (status === 'archived') {
+      closeSubscribersForSession(id, CLOSE_SESSION_ARCHIVED);
+    }
+
     const row = /** @type {SessionRow} */ (
       db.prepare('SELECT * FROM sessions WHERE id = ?').get(id)
     );
@@ -430,5 +445,43 @@ export function registerSessionsRoutes(
     const result = await promptSession(db, fetchImpl, id, body);
     reply.code(result.status);
     return result.body;
+  });
+
+  // Bulk cleanup (issue #29): best-effort stop/remove any live containers, then delete all
+  // `sessions` rows and their `events` history. No FK `ON DELETE CASCADE` exists on `events`
+  // (`002_sessions_events.sql`), so events are deleted explicitly per session before the row
+  // itself, mirroring the archive handler's non-fatal container-teardown pattern above.
+  app.delete('/api/sessions', async (req, _reply) => {
+    const rows = /** @type {SessionRow[]} */ (
+      db.prepare('SELECT * FROM sessions').all()
+    );
+
+    // Stop containers concurrently, not sequentially — a `docker stop` against an
+    // already-gone container can take several seconds to fail, and this endpoint may be
+    // clearing dozens of stale rows at once (verified live: sequential awaits made this
+    // endpoint take 100+ seconds with ~20 stale sessions).
+    await Promise.allSettled(
+      rows
+        .filter(
+          /** @returns {row is SessionRow & {container_name: string}} */ (
+            row,
+          ) => Boolean(row.container_name),
+        )
+        .map((row) =>
+          sandbox.stop(row.container_name).catch((err) => {
+            req.log?.error?.(
+              { err, containerName: row.container_name },
+              'failed to stop sandbox container while clearing all sessions',
+            );
+          }),
+        ),
+    );
+
+    db.prepare(
+      'DELETE FROM events WHERE session_id IN (SELECT id FROM sessions)',
+    ).run();
+    const result = db.prepare('DELETE FROM sessions').run();
+
+    return { deleted: result.changes };
   });
 }

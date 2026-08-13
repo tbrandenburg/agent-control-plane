@@ -13,6 +13,8 @@ export type SocketStatus = 'connecting' | 'open' | 'reconnecting' | 'closed';
 
 /** WS close code the server sends for a missing/stale `wsToken` (`routes/ws.js`). */
 const CLOSE_UNAUTHORIZED = 4001;
+/** WS close code the server sends when the session is in a terminal status (`routes/ws.js`). */
+const CLOSE_SESSION_ARCHIVED = 4002;
 /** Delay before a dropped, non-auth-failure socket reconnects. */
 const RECONNECT_DELAY_MS = 1000;
 
@@ -24,13 +26,17 @@ function wsUrl(sessionId: string): string {
 /**
  * Connects to the session's WebSocket transcript. Returns accumulated events plus the live
  * connection state; reconnects automatically after an unexpected drop, but never after an
- * auth failure (`invalidToken`).
+ * auth failure (`invalidToken`) or a terminal-status close (`4002`).
  * @param sessionId - Session whose transcript to stream.
  * @param wsToken - Plaintext token minted at session creation (§6); `null` disables connecting.
+ * @param shouldConnect - Whether the socket should be open at all — `false` for a session in a
+ *   terminal status (`archived`/`pending_bootstrap-failed`), so a lingering socket never shows a
+ *   stale "Connected" indicator (issue #28). Defaults to `true`.
  */
 export function useSessionSocket(
   sessionId: string,
   wsToken: string | null,
+  shouldConnect = true,
 ): { events: EventRecord[]; status: SocketStatus; invalidToken: boolean } {
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [status, setStatus] = useState<SocketStatus>('connecting');
@@ -38,6 +44,11 @@ export function useSessionSocket(
   const nextId = useRef(0);
 
   useEffect(() => {
+    if (!shouldConnect) {
+      setStatus('closed');
+      return;
+    }
+
     if (!wsToken) {
       setStatus('closed');
       setInvalidToken(true);
@@ -85,6 +96,10 @@ export function useSessionSocket(
           setStatus('closed');
           return;
         }
+        if (ev.code === CLOSE_SESSION_ARCHIVED) {
+          setStatus('closed');
+          return;
+        }
         setStatus('closed');
         reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS);
       });
@@ -97,7 +112,7 @@ export function useSessionSocket(
       if (reconnectTimer) clearTimeout(reconnectTimer);
       socket?.close();
     };
-  }, [sessionId, wsToken]);
+  }, [sessionId, wsToken, shouldConnect]);
 
   return { events, status, invalidToken };
 }

@@ -14,6 +14,12 @@ import { promptSession } from '../prompt-session.js';
 const subscribers = new Map();
 
 const CLOSE_UNAUTHORIZED = 4001;
+/** Sent when a socket subscribes (or is already subscribed) to a session in a terminal status
+ * (`archived`/`pending_bootstrap-failed`) — issue #28's state machine. */
+export const CLOSE_SESSION_ARCHIVED = 4002;
+
+/** Session statuses that never accept new/continued WS subscribers. */
+const TERMINAL_STATUSES = new Set(['archived', 'pending_bootstrap-failed']);
 
 /**
  * Sends `payload` (JSON-stringified) to every socket currently subscribed to `sessionId`.
@@ -27,6 +33,22 @@ export function broadcastToSession(sessionId, payload) {
   const message = JSON.stringify(payload);
   for (const socket of sockets) {
     socket.send(message);
+  }
+}
+
+/**
+ * Closes every socket currently subscribed to `sessionId` with the given close code, e.g. when
+ * a session transitions into a terminal status (issue #28) and any already-open socket must be
+ * proactively dropped rather than left to linger showing a stale "Connected" indicator.
+ * @param {string} sessionId - Session id whose subscriber sockets should be closed.
+ * @param {number} code - WS close code to send.
+ * @returns {void}
+ */
+export function closeSubscribersForSession(sessionId, code) {
+  const sockets = subscribers.get(sessionId);
+  if (!sockets) return;
+  for (const socket of sockets) {
+    socket.close(code);
   }
 }
 
@@ -98,11 +120,18 @@ export function registerWsRoutes(
         if (type === 'subscribe') {
           // `subscribe` is a hard precondition (never logged: the plaintext `wsToken` must not
           // appear anywhere, including error logs).
-          const row = /** @type {{ws_token: string}|undefined} */ (
-            db.prepare('SELECT ws_token FROM sessions WHERE id = ?').get(id)
-          );
+          const row =
+            /** @type {{ws_token: string, status: string}|undefined} */ (
+              db
+                .prepare('SELECT ws_token, status FROM sessions WHERE id = ?')
+                .get(id)
+            );
           if (!row || row.ws_token !== message.wsToken) {
             socket.close(CLOSE_UNAUTHORIZED);
+            return;
+          }
+          if (TERMINAL_STATUSES.has(row.status)) {
+            socket.close(CLOSE_SESSION_ARCHIVED);
             return;
           }
           subscribed = true;
