@@ -23,7 +23,7 @@ export function PromptComposer({
     content: string;
     model: string;
     reasoningEffort: string;
-  }) => void;
+  }) => Promise<unknown>;
 }) {
   const [content, setContent] = useState('');
   const [model, setModel] = useState(defaultModel ?? models[0]?.id ?? '');
@@ -31,10 +31,18 @@ export function PromptComposer({
     defaultReasoningEffort ?? 'high',
   );
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!content.trim() || !model) return;
-    onSubmit({ content, model, reasoningEffort });
-    setContent('');
+    // Only clear the composer once the send actually succeeds — on failure,
+    // preserve the typed text so the user can retry with one click instead
+    // of retyping (see issue #15).
+    try {
+      await onSubmit({ content, model, reasoningEffort });
+      setContent('');
+    } catch {
+      // Error is surfaced by the caller (e.g. sendPrompt.isError); keep the
+      // typed content so the user can retry.
+    }
   }
 
   return (
