@@ -814,6 +814,91 @@ describe('PATCH /api/sessions/:id', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ id: 'sess-1', status: 'active' });
+    expect(sandbox.stop).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('archiving a session with a live container stops it and clears container_name', async () => {
+    vi.mocked(sandbox.stop).mockResolvedValue({ method: 'docker' });
+    const app = buildServer();
+    seedSession(getDb(app), {
+      id: 'sess-1',
+      status: 'active',
+      container_name: 'sandbox-1',
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/sessions/sess-1',
+      payload: { status: 'archived' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(sandbox.stop).toHaveBeenCalledWith('sandbox-1');
+
+    const row = getDb(app)
+      .prepare('SELECT status, container_name FROM sessions WHERE id = ?')
+      .get('sess-1');
+    expect(row.status).toBe('archived');
+    expect(row.container_name).toBeNull();
+    await app.close();
+  });
+
+  it('archiving still succeeds (status flips) even if sandbox.stop() throws', async () => {
+    vi.mocked(sandbox.stop).mockRejectedValue(
+      new Error('docker: no such container'),
+    );
+    const app = buildServer();
+    seedSession(getDb(app), {
+      id: 'sess-1',
+      status: 'active',
+      container_name: 'sandbox-1',
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/sessions/sess-1',
+      payload: { status: 'archived' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ id: 'sess-1', status: 'archived' });
+    expect(sandbox.stop).toHaveBeenCalledWith('sandbox-1');
+
+    // Stop failed, so container_name is left as-is for later manual cleanup, but the
+    // archive status itself still took effect.
+    const row = getDb(app)
+      .prepare('SELECT status, container_name FROM sessions WHERE id = ?')
+      .get('sess-1');
+    expect(row.status).toBe('archived');
+    expect(row.container_name).toBe('sandbox-1');
+    await app.close();
+  });
+
+  it('archiving a session with no live container skips calling sandbox.stop()', async () => {
+    const app = buildServer();
+    seedSession(getDb(app), {
+      id: 'sess-1',
+      status: 'active',
+      container_name: null,
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/sessions/sess-1',
+      payload: { status: 'archived' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(sandbox.stop).not.toHaveBeenCalled();
+
+    const row = getDb(app)
+      .prepare('SELECT status FROM sessions WHERE id = ?')
+      .get('sess-1');
+    expect(row.status).toBe('archived');
     await app.close();
   });
 });

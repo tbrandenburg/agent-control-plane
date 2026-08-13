@@ -136,7 +136,7 @@ All routes live under `/api/*` except the GitHub webhook (unprefixed), matching
 | `POST /api/sessions` | Insert session row (`status: pending_bootstrap`), return `{id, wsToken}` immediately (`201`); `bootstrapWorkspace` + `docker run` happen via `setImmediate` **after** the response is sent (§10) |
 | `GET /api/sessions` | List; `limit`/`offset`/`status` query params |
 | `GET /api/sessions/:id` | Session + live container status (`docker inspect`) + `continuation` object (§7). **Rotates the ws token unconditionally on every call, storing only its hash** (§6) |
-| `PATCH /api/sessions/:id` | `{status}` update |
+| `PATCH /api/sessions/:id` | `{status}` update. Transitioning to `archived` **also tears down the live sandbox container** (calls the same `sandbox.stop()` path as `POST /api/sessions/:id/stop` and clears `container_name`) if one is running — a stop failure is logged but non-fatal, the DB status still flips to `archived` |
 | `POST /api/sessions/:id/stop` | Synchronous proxy call straight to the bridge's `POST /stop`, which calls OpenCode's native `abort`; falls back to `docker stop` only if the bridge doesn't respond within a timeout |
 | `POST /api/sessions/:id/prompt` | Synchronous proxy call straight to the bridge's `POST /prompt`; ack `{messageId, position}` returned once the bridge accepts the call. Runs `resolveActiveSession` first (§7) |
 | `GET /api/sessions/:id/events` | Cursor-paginated read from the `events` table |
@@ -547,6 +547,14 @@ bridge responding `ok` no longer gets mistaken for the container having actually
 The stop route also clears the session row's `container_name` on success; `sessions.status` itself
 is left untouched, since the derived `running`/`stopped`/`failed` values are never persisted
 (§1) — they're computed client-side from the live `docker inspect` phase.
+
+`PATCH /api/sessions/:id`'s `archived` transition (GitHub issue #19 correction) reuses this same
+`sandbox.stop()` call when the session has a live `container_name`, so archiving a session actually
+tears down its sandbox instead of leaving it running indefinitely. Unlike the dedicated stop route,
+a stop failure here is **non-fatal** to the archive itself — it's logged, but `sessions.status` still
+flips to `archived` (the container can be cleaned up manually later; retrying a stop against an
+already-torn-down container is a no-op). The `active` transition is unaffected — it never touches
+the sandbox.
 
 The OpenCode **event relay** direction (bridge → control plane) is unaffected by this — it was always
 a push, never had a poll/ack problem.
