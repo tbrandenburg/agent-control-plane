@@ -17,10 +17,47 @@
  * underlying frame exposes one.
  */
 import { useMemo, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { EventRecord } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import type { SocketStatus } from '@/hooks/useSessionSocket';
 import { cn } from '@/lib/utils';
+
+/**
+ * Minimal Tailwind styling for markdown elements to fit the dashboard's existing look (issue
+ * #30). `entry.text` grows incrementally as `message.part.delta` frames arrive, so a mid-stream
+ * unclosed code fence/bold marker is expected — react-markdown renders partial markdown
+ * gracefully rather than throwing.
+ */
+const markdownComponents = {
+  code: ({ className, ...props }: React.ComponentPropsWithoutRef<'code'>) => (
+    <code
+      className={cn('rounded bg-black/10 px-1 py-0.5 text-xs', className)}
+      {...props}
+    />
+  ),
+  pre: (props: React.ComponentPropsWithoutRef<'pre'>) => (
+    <pre
+      className="overflow-x-auto rounded bg-black/10 p-2 text-xs"
+      {...props}
+    />
+  ),
+  a: (props: React.ComponentPropsWithoutRef<'a'>) => (
+    <a
+      className="text-primary underline underline-offset-2"
+      target="_blank"
+      rel="noreferrer"
+      {...props}
+    />
+  ),
+  ul: (props: React.ComponentPropsWithoutRef<'ul'>) => (
+    <ul className="list-disc pl-5" {...props} />
+  ),
+  ol: (props: React.ComponentPropsWithoutRef<'ol'>) => (
+    <ol className="list-decimal pl-5" {...props} />
+  ),
+};
 
 type Role = 'user' | 'assistant';
 
@@ -230,7 +267,14 @@ export function Transcript({
                   {entry.timestamp}
                 </span>
               </div>
-              <span className="whitespace-pre-wrap">{entry.text}</span>
+              <div className="text-sm [&_p]:m-0">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={markdownComponents}
+                >
+                  {entry.text}
+                </ReactMarkdown>
+              </div>
             </li>
           ))}
         </ul>
