@@ -333,4 +333,16 @@
   committing this change (root `AGENTS.md`'s evidence-first rule) — re-run that same check after
   editing repo-root `opencode.jsonc` to confirm the pushed content is what a sandbox will actually
   receive, since `bootstrapWorkspace()` clones `origin/main`, not the working tree.
+- 2026-08-13: `opencode serve` (the actual command `sandbox/Dockerfile`'s `CMD` runs) has **no**
+  `--auto`/`--dangerously-skip-permissions` flag — verified via `opencode serve --help`; those flags
+  only exist on the interactive `opencode [project]`/`opencode run` commands. So opencode's default
+  `ask` permission (e.g. for the bash tool) previously left every unattended sandbox session
+  permanently stuck on a `permission.asked` event with zero approval-relay mechanism anywhere in
+  this codebase (GitHub issue #7). Fixed with `"permission": "allow"` in repo-root `opencode.jsonc`
+  (bind-mounted as every sandbox's Global config per the bullet above) — a config-level fix, not a
+  CLI flag, and deliberately blanket rather than scoped to just `bash`, since the target repo is
+  bind-mounted read-only (`sandbox.js:127`'s `:ro`) regardless of tool permission, and a narrower
+  allow-list risks another tool defaulting to `ask` and silently hanging the same way. Verified with
+  a real, unmocked isolated stack: the exact bash-tool prompt that previously hung indefinitely now
+  completes with zero `permission.asked` events and a correct, verbatim reply.
 
