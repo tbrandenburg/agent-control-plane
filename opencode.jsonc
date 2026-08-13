@@ -6,6 +6,18 @@
   "autoupdate": false,
   "share": "disabled",
 
+  // GitHub issue #7: opencode's default "ask" permission (e.g. for the bash tool) has no
+  // approval-relay mechanism anywhere in this control plane (no WS message type, no dashboard
+  // UI) — a session whose agent chooses bash over read/glob hangs forever with zero recovery.
+  // Blanket-allowed here (not scoped to just `bash`) because every sandbox is single-session,
+  // ephemeral, and the actual target repo is bind-mounted read-only (`sandbox.js`'s `:ro` on
+  // `/workspace/repo`), so even a fully-trusted agent can't destructively touch it at the OS
+  // level; only the sandbox's own scratch space and the read-write team-config mount are
+  // actually writable. No human is in the loop today regardless — "ask" currently means "hang
+  // forever," not "someone reviews it" — so this is strictly a functional fix, not a regression
+  // in oversight. Revisit if/when a real approval-relay UI is built.
+  "permission": "allow",
+
   // Optional local tooling. These servers do not contain credentials or host-specific paths.
   "mcp": {
     "playwright": {
