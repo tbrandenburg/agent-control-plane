@@ -22,6 +22,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends docker.io git c
 
 WORKDIR /app
 
+# Build-time git SHA (issue #18: verify a live redeploy actually shipped a given commit via
+# `GET /version` instead of trusting "merged"/"tests passed" alone). Passed as `--build-arg
+# GIT_SHA=$(git rev-parse HEAD)` by `make build`/`docker-compose.yml`; defaults to `unknown` for
+# a bare `docker build` invoked without that arg.
+ARG GIT_SHA=unknown
+ENV GIT_SHA=${GIT_SHA}
+
 # Manifests first so `pnpm install` layers cache independently of source changes.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY control-plane/package.json control-plane/package.json

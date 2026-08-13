@@ -133,6 +133,8 @@ All routes live under `/api/*` except the GitHub webhook (unprefixed), matching
 
 | Endpoint | Behavior |
 |---|---|
+| `GET /health` | Liveness probe, `{status: 'ok'}` — used by the Dockerfile `HEALTHCHECK` and `make e2e`'s readiness poll |
+| `GET /version` | `{gitSha}` — the running image's build-time `git rev-parse HEAD` (baked in via the `GIT_SHA` Docker build arg, `'unknown'` outside a Docker build). Exists so a redeploy can be verified against the actual deployed commit instead of trusting "merged"/"tests passed" alone (issue #18 — a merged, unit-tested fix silently ran stale for ~53 minutes because the container was never rebuilt) |
 | `POST /api/sessions` | Insert session row (`status: pending_bootstrap`), return `{id, wsToken}` immediately (`201`); `bootstrapWorkspace` + `docker run` happen via `setImmediate` **after** the response is sent (§10) |
 | `GET /api/sessions` | List; `limit`/`offset`/`status` query params |
 | `GET /api/sessions/:id` | Session + live container status (`docker inspect`) + `continuation` object (§7). **Rotates the ws token unconditionally on every call, storing only its hash** (§6) |
