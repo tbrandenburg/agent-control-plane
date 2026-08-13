@@ -208,4 +208,47 @@ describe('Transcript', () => {
 
     expect(screen.getByText('MessageAbortedError')).toBeInTheDocument();
   });
+
+  it('renders markdown formatting (bold, fenced code) as real elements, not literal text', () => {
+    const events: EventRecord[] = [
+      event({
+        id: 1,
+        payload: JSON.stringify({
+          type: 'message.part.delta',
+          properties: {
+            messageID: 'm1',
+            partID: 'p1',
+            delta: '**bold** text\n\n```js\nconst x = 1;\n```',
+          },
+        }),
+      }),
+    ];
+
+    render(<Transcript events={events} status="open" invalidToken={false} />);
+
+    const bold = screen.getByText('bold');
+    expect(bold.tagName).toBe('STRONG');
+    const code = screen.getByText('const x = 1;');
+    expect(code.tagName).toBe('CODE');
+  });
+
+  it('does not crash on a mid-stream, unclosed markdown fence/bold marker', () => {
+    const events: EventRecord[] = [
+      event({
+        id: 1,
+        payload: JSON.stringify({
+          type: 'message.part.delta',
+          properties: {
+            messageID: 'm1',
+            partID: 'p1',
+            delta: 'Here is some **bold and a ```unterminated code',
+          },
+        }),
+      }),
+    ];
+
+    expect(() =>
+      render(<Transcript events={events} status="open" invalidToken={false} />),
+    ).not.toThrow();
+  });
 });
