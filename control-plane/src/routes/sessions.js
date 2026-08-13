@@ -344,6 +344,14 @@ export function registerSessionsRoutes(
 
     try {
       const result = await sandbox.stop(row.container_name);
+      // `sessions.status` never stores the derived `running`/`stopped`/`failed` values
+      // (ARCHITECTURE.md §1/§9, `StatusBadge.tsx`'s own doc comment) — those are computed
+      // client-side from the live `docker inspect` phase, not persisted here. Only
+      // `container_name` is this route's responsibility to clear, since the container it named
+      // no longer exists after a real `docker stop`/`rm`.
+      db.prepare(
+        "UPDATE sessions SET container_name = NULL, updated_at = datetime('now') WHERE id = ?",
+      ).run(id);
       return { status: 'stopped', method: result.method };
     } catch (err) {
       reply.code(502);
