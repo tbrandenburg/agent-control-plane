@@ -18,20 +18,24 @@ export const MODEL_ALLOWLIST = [
  * (target/platform/team) is now resolved and cloned by real `git` at bootstrap time; only this
  * default *URL* (overridable via env) is a config-time constant.
  *
- * Must be a real, public, always-clonable-without-credentials repo: the previous default
- * (`tbrandenburg/agent-control-plane`) is a **private** GitHub repo, so every credential-less
- * `bootstrapWorkspace()` call (any session, any environment without host git credentials leaked
- * into the container) failed at this unconditional platform-repo clone step (gap step `00700`).
- * `docs/phase_02_findings.md`'s Option C decision means the control plane never injects any
- * provider/gateway default itself, so this default's *content* is irrelevant to model resolution
- * — only that it is always, unconditionally clonable. `octocat/Hello-World` is GitHub's own
- * canonical, first-ever-created public sample repo (also reused as a target-repo fixture by
- * `e2e/fixtures/distinct-target-repos.mjs`, which is fine — platform and target trees are cloned
- * to distinct destinations regardless of URL overlap).
+ * Must be a real, public, always-clonable-without-credentials repo. Step `00700` found this
+ * repo's own URL unusable as this default because it was **private** at the time, so it was
+ * swapped for `octocat/Hello-World` (content-irrelevant, only clonability mattered — see
+ * `docs/phase_02_findings.md`). This repo (`tbrandenburg/agent-control-plane`) was subsequently
+ * made **public**, which reopens using it directly: its own root `opencode.jsonc` (repo-root,
+ * committed) becomes the platform config every spawned sandbox actually gets, bind-mounted
+ * verbatim at `/root/.config/opencode` (`sandbox.js`'s `GLOBAL_CONFIG_CONTAINER_PATH`) — the
+ * first time the platform-config layer carries real, intentional content instead of an
+ * arbitrary placeholder repo. Verified with a real, credential-less `git clone` before switching
+ * (root `AGENTS.md`'s evidence-first rule). `docs/phase_02_findings.md`'s Option C decision still
+ * holds: the control plane itself never injects a provider/gateway default — this repo's
+ * `opencode.jsonc` sets `model`/`autoupdate`/`mcp`/`provider` as a normal opencode config file,
+ * layered under the control plane's own non-negotiable `OPENCODE_CONFIG_CONTENT` (step 6, which
+ * still wins on `model`).
  * @type {string}
  */
 export const PLATFORM_CONFIG_REPO =
-  'https://github.com/octocat/Hello-World.git';
+  'https://github.com/tbrandenburg/agent-control-plane.git';
 
 /**
  * @typedef {object} ControlPlaneConfig

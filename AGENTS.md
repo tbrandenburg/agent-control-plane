@@ -315,4 +315,22 @@
   extension) — only `octocat/Spoon-Knife` ships `README.md`. A green step closure that never
   actually got a session past `pending_bootstrap` can hide arbitrarily many downstream assertion
   bugs; fixing an upstream blocker can immediately surface them.
+- 2026-08-13: This repo (`tbrandenburg/agent-control-plane`) was made **public**, reopening it as
+  `control-plane/src/config.js`'s `PLATFORM_CONFIG_REPO` default (previously swapped out for
+  `octocat/Hello-World` in step `00700` for exactly this reason — see the bullet above). Repo-root
+  `opencode.jsonc` is this repo's **own dev-time opencode config** (loaded when a human/agent runs
+  `opencode` inside this checkout) **and**, now that `PLATFORM_CONFIG_REPO` points at this repo, it
+  doubles as the platform-config layer every spawned sandbox actually receives: `bootstrap.js`
+  clones this whole repo, and `sandbox.js` bind-mounts the resulting `platformConfigDir` verbatim
+  at `/root/.config/opencode` (`GLOBAL_CONFIG_CONTAINER_PATH`) inside the container — so whatever
+  is at repo-root `opencode.jsonc` right now (`model: opencode/big-pickle`, `autoupdate: false`,
+  a couple of MCP servers, non-credentialed provider option blocks) is literally opencode's Global
+  config inside every sandbox. **Because of that bind-mount, repo-root `opencode.jsonc` must never
+  contain credentials, tokens, or machine-specific paths/permissions** — unlike a personal
+  `~/.config/opencode/opencode.jsonc`, this file is public and gets shipped into every session's
+  sandbox verbatim. Verified with a real, credential-less `git clone` of this repo plus a real
+  (unmocked) `bootstrapWorkspace()` call reading the cloned `opencode.jsonc` back off disk before
+  committing this change (root `AGENTS.md`'s evidence-first rule) — re-run that same check after
+  editing repo-root `opencode.jsonc` to confirm the pushed content is what a sandbox will actually
+  receive, since `bootstrapWorkspace()` clones `origin/main`, not the working tree.
 
