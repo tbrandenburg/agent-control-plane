@@ -346,3 +346,20 @@
   a real, unmocked isolated stack: the exact bash-tool prompt that previously hung indefinitely now
   completes with zero `permission.asked` events and a correct, verbatim reply.
 
+
+## Lessons Learned
+
+- 2026-08-13: A subagent's own "server-side logic is already correct, confirmed by reading the
+  code" claim for issue #8 (Stop button 400) was not actually verified end-to-end — real E2E
+  testing after integration showed `POST /api/sessions/:id/stop`'s bridge-success path (per
+  `docs/ARCHITECTURE.md` §9's own documented design) never actually stops/removes the container,
+  contradicting `sessions.js`'s own doc comment. Always run the literal user-facing action
+  end-to-end (not just "does the request reach the handler without error") before accepting a
+  subagent's server-side-correctness claim; filed as a separate follow-up issue (#10) rather than
+  scope-creeping into the original fix.
+- 2026-08-13: `vi.fn(() => Promise.resolve(...))`'s inferred `mock.calls[0]` type is `never[]`,
+  so casting it directly `as [string, RequestInit]` fails `tsc --noEmit` with TS2352 ("may be a
+  mistake") even though the runtime value is correct — cast through `as unknown as [...]` instead.
+  `pnpm test` (vitest) does not run `tsc`, so this type error only surfaces via a separate
+  `pnpm typecheck`/`tsc --noEmit` run; always run both after adding test files with typed mock
+  assertions, not just the test runner.
