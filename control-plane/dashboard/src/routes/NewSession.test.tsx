@@ -99,3 +99,28 @@ describe('NewSession — team config field', () => {
     expect(body.teamConfigRepo).toBe('acme/team-config');
   });
 });
+
+describe('NewSession — empty models', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('shows an empty-state message and disables Create Session when no models are configured', async () => {
+    const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
+      if (String(url).includes('/api/models'))
+        return jsonResponse({ models: [] });
+      return jsonResponse({ id: 'sess-1', wsToken: 'tok-1' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderNewSession();
+
+    await waitFor(() =>
+      expect(screen.getByText(/no models configured/i)).toBeInTheDocument(),
+    );
+    expect(screen.queryByLabelText(/^model$/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /create session/i }),
+    ).toBeDisabled();
+  });
+});
