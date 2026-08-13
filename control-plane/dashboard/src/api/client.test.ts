@@ -17,7 +17,10 @@ describe('client request()', () => {
     await stopSession('s1');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
     expect(init.headers).not.toHaveProperty('content-type');
   });
 
@@ -33,7 +36,10 @@ describe('client request()', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
     expect((init.headers as Record<string, string>)['content-type']).toBe(
       'application/json',
     );
