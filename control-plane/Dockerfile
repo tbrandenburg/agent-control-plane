@@ -20,6 +20,32 @@ RUN corepack enable
 RUN apt-get update && apt-get install -y --no-install-recommends docker.io git ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
+# Optional corporate/self-signed CA certificate (e.g. a TLS-inspecting proxy on a corporate
+# Windows/WSL machine) — without it, `corepack`'s pnpm download and any `git clone` over HTTPS
+# fail with "self-signed certificate in certificate chain" / "SELF_SIGNED_CERT_IN_CHAIN". Pass
+# `make run CA_FILE=/path/to/ca.crt` (see root Makefile/docker-compose.yml); it's mounted at
+# build time as a BuildKit secret — read directly from its original host path, never copied into
+# this repo's build context as a source file. Its content IS installed into this image's system
+# CA store below (needed so `git` clones inside the *running* container, e.g. bootstrap.js, also
+# trust it) and set via NODE_EXTRA_CA_CERTS for Node's own TLS stack (used by corepack's fetch).
+# When CA_FILE isn't set, the secret mount is simply empty and this is a no-op.
+#
+# `RUN --mount=type=secret` is deliberately excluded from BuildKit's cache key, so a changed
+# CA_FILE would otherwise silently reuse a stale cached layer from a previous build. CA_CERT_HASH
+# (a sha256 of CA_FILE's contents, computed by the root Makefile — never the cert itself) is a
+# regular ARG referenced in the RUN command below purely to force cache invalidation whenever the
+# cert's content actually changes.
+ARG CA_CERT_HASH=none
+RUN --mount=type=secret,id=ca_cert \
+    : "cache-bust ${CA_CERT_HASH}" && \
+    if [ -s /run/secrets/ca_cert ]; then \
+      cp /run/secrets/ca_cert /usr/local/share/ca-certificates/custom-ca.crt \
+        && update-ca-certificates; \
+    else \
+      : > /usr/local/share/ca-certificates/custom-ca.crt; \
+    fi
+ENV NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/custom-ca.crt
+
 WORKDIR /app
 
 # Build-time git SHA (issue #18: verify a live redeploy actually shipped a given commit via

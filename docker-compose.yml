@@ -6,6 +6,9 @@ services:
       dockerfile: control-plane/Dockerfile
       args:
         GIT_SHA: ${GIT_SHA:-unknown}
+        CA_CERT_HASH: ${CA_CERT_HASH:-none}
+      secrets:
+        - ca_cert
     ports:
       - "${HOST_PORT:-3000}:3000"
     volumes:
@@ -50,3 +53,11 @@ services:
 networks:
   egress-net:
     name: ${SANDBOX_NETWORK:-egress-net}
+
+# Optional corporate/self-signed CA cert for `control-plane`'s build (see its Dockerfile and the
+# root Makefile's CA_FILE variable) — referenced directly from CA_FILE's path on the host, never
+# copied into this repo. Defaults to /dev/null (empty) so the build's secret mount is a no-op
+# when CA_FILE isn't set.
+secrets:
+  ca_cert:
+    file: ${CA_FILE:-/dev/null}
