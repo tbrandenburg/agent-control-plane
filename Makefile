@@ -1,4 +1,4 @@
-.PHONY: help install run stop test lint build clean loc e2e typecheck sandbox-image deploy release dev-stack dev-stack-down
+.PHONY: help install run run-dev stop test lint build clean loc e2e typecheck sandbox-image deploy release dev-stack dev-stack-down
 
 ## Default target — list all available targets.
 help:
@@ -9,13 +9,34 @@ help:
 install:
 	pnpm run install:all
 
-## Start the control-plane server.
-run:
-	pnpm run run:control-plane
+## Bring up the persistent, real docker compose stack for everyday development (fresh full-stack
+## bring-up on a dev machine). Builds, starts detached, polls /health, prints the URL. Does not
+## tear down on exit — use `make stop` when done. For a one-off, always-torn-down verification run
+## use `make e2e`; for redeploying just the control-plane service onto an already-running stack
+## with GIT_SHA tracking (prod-like), use `make deploy`.
+run: build
+	GIT_SHA=$$(git rev-parse HEAD) docker compose up -d --build
+	@timeout=60; \
+	until curl -sf http://localhost:$${HOST_PORT:-3000}/health > /dev/null 2>&1; do \
+		timeout=$$((timeout - 1)); \
+		if [ $$timeout -le 0 ]; then \
+			echo "ERROR: control-plane did not become healthy within 60s" >&2; \
+			docker compose logs; \
+			exit 1; \
+		fi; \
+		sleep 1; \
+	done; \
+	echo "Ready: http://localhost:$${HOST_PORT:-3000}"
 
-## Stop the docker compose stack.
+## Stop the docker compose stack started by `make run`.
 stop:
 	docker compose down
+
+## Start the control-plane server locally via pnpm, no Docker/sandboxing (today's `make run`
+## behavior, kept under a new name). Runs in the foreground; stop with Ctrl+C. Deliberately no
+## PID-file/background tracking — keeps this interactive dev-loop target simple.
+run-dev:
+	pnpm run run:control-plane
 
 ## Run all unit/integration tests across the workspace.
 test:

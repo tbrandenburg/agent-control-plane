@@ -16,13 +16,16 @@
 Run `make help` for the full list. Most common:
 
 - `make install` — install all workspace deps
-- `make run` — start the control-plane server (no Docker)
+- `make run` — bring up the persistent, real docker compose stack (fresh dev bring-up); `make stop`
+  to tear it down
+- `make run-dev` — start the control-plane server locally via pnpm (no Docker), foreground/Ctrl+C
 - `make test` / `make lint` / `make typecheck` — unit+integration tests / biome / tsc
 - `make e2e` — build sandbox image, bring up the real docker compose stack, run Playwright, tear down
 - `make dev-stack` / `make dev-stack-down` — isolated, ad-hoc verification stack (unique port +
   compose project + `SANDBOX_NETWORK`) safe to run alongside another already-running stack; only
   `smoke.spec.ts` is safe against it (`session-lifecycle.spec.ts` reads the default stack's DB directly)
-- `make deploy` — rebuild+redeploy control-plane with the current commit's `GIT_SHA` baked in
+- `make deploy` — rebuild+redeploy control-plane with the current commit's `GIT_SHA` baked in (onto
+  an already-running stack, prod-like; `make run` is for a fresh full-stack bring-up)
 - `make release BUMP=patch|minor|major` — bump version, tag, push, cut a GitHub release
 
 ## Validation Conventions

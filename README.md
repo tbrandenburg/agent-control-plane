@@ -13,17 +13,17 @@ WebSocket. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full desig
 
 ```bash
 make install   # install all workspace deps (pnpm)
-make run       # start the control-plane server directly (no Docker)
+make run       # bring up the persistent, real docker compose stack
 ```
 
-Or run the full containerized stack:
+Or run the control-plane locally via pnpm, no Docker/sandboxing:
 
 ```bash
-make build            # build the dashboard bundle
-GIT_SHA=$(git rev-parse HEAD) docker compose up -d --build
+make run-dev
 ```
 
-The dashboard is served at `http://localhost:${HOST_PORT:-3000}`.
+The dashboard is served at `http://localhost:${HOST_PORT:-3000}`. Stop the Docker stack with
+`make stop`.
 
 ## Make targets
 
@@ -32,7 +32,9 @@ Run `make help` for the full list. Most common:
 | Target | Description |
 |---|---|
 | `make install` | Install all workspace dependencies |
-| `make run` | Start the control-plane server (no Docker) |
+| `make run` | Bring up the persistent, real docker compose stack (fresh dev bring-up) |
+| `make stop` | Stop the docker compose stack |
+| `make run-dev` | Start the control-plane server locally via pnpm (no Docker) |
 | `make test` | Run all unit/integration tests |
 | `make lint` | Check and fix code quality with Biome |
 | `make typecheck` | Type-check all workspaces with `tsc` |
