@@ -35,19 +35,19 @@ stop:
 ## Start the control-plane server locally via pnpm, no Docker/sandboxing (today's `make run`
 ## behavior, kept under a new name). Runs in the foreground; stop with Ctrl+C. Deliberately no
 ## PID-file/background tracking — keeps this interactive dev-loop target simple.
-run-dev:
+run-dev: install
 	pnpm run run:control-plane
 
 ## Run all unit/integration tests across the workspace.
-test:
+test: install
 	pnpm run test:all
 
 ## Check and fix code quality with biome.
-lint:
+lint: install
 	pnpm run lint
 
 ## Build the dashboard static bundle into control-plane/public.
-build:
+build: install
 	pnpm run build:dashboard
 	@test -f control-plane/public/index.html || \
 		(echo "ERROR: control-plane/public/index.html missing after build:dashboard" >&2 && exit 1)
@@ -63,7 +63,7 @@ loc:
 	pnpm run loc
 
 ## Bring up the real docker compose stack, run Playwright against it, then tear it down.
-e2e:
+e2e: install
 	@export GIT_SHA=$$(git rev-parse HEAD); \
 	trap 'docker compose down -v' EXIT; \
 	$(if $(SKIP_BUILD),,docker compose build sandbox;) \
@@ -81,7 +81,7 @@ e2e:
 	E2E_BASE_URL="http://localhost:$${HOST_PORT:-3000}" pnpm run e2e
 
 ## Type-check all workspaces with tsc (no build step).
-typecheck:
+typecheck: install
 	pnpm run typecheck:all
 
 ## Bring up an isolated, ad-hoc verification stack safe to run alongside an already-running
