@@ -382,6 +382,19 @@ Run `make help` for the full list. Most common:
 
 ## Lessons Learned
 
+- 2026-08-26: Fixing issue #34 (`engines.node` pinned to `24.x` blocking Node 26) — no nvm/fnm/
+  asdf/volta or pre-pulled Node 26 runtime existed in this sandbox, but a real `node:26-slim`
+  Docker container was available and gave a genuine Node 26 validation instead of trusting
+  `jsdom@^29`'s already-documented Node 26 compatibility alone: `docker run node:26-slim` +
+  `npm install -g pnpm@10.33.2` + `pnpm install/lint/typecheck/test/build` all passed with the
+  widened `engines.node`. The only 3 test failures seen (`bootstrap.test.js`'s real-GitHub-clone
+  cases, `fatal: could not read Username for 'https://github.com'`) reproduced byte-for-byte
+  identically on a matching `node:24-slim` container with the same missing DNS/network access, so
+  they were confirmed to be a network-isolation artifact of that ad hoc container, not a Node 26
+  regression. Lesson: before assuming a target runtime is "unavailable to test," check whether
+  Docker can pull it — a disposable container often beats a version-manager install for one-off
+  cross-Node validation, and always cross-check any container-specific failure against the same
+  container recipe on the *current* known-good Node version before blaming the new one.
 - 2026-08-13: A subagent's own "server-side logic is already correct, confirmed by reading the
   code" claim for issue #8 (Stop button 400) was not actually verified end-to-end — real E2E
   testing after integration showed `POST /api/sessions/:id/stop`'s bridge-success path (per
