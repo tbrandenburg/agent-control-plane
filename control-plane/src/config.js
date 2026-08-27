@@ -10,11 +10,12 @@
  */
 export const MODEL_ALLOWLIST = [
   { id: 'opencode/big-pickle', name: 'Big Pickle' },
-  { id: 'opencode/deepseek-v4-flash-free', name: 'DeepSeek V4 Flash (Free)' },
   { id: 'opencode/hy3-free', name: 'HY3 (Free)' },
-  { id: 'opencode/laguna-s-2.1-free', name: 'Laguna S 2.1 (Free)' },
-  { id: 'opencode/ling-3.0-tiny-free', name: 'Ling 3.0 Tiny (Free)' },
   { id: 'opencode/mimo-v2.5-free', name: 'Mimo V2.5 (Free)' },
+  {
+    id: 'opencode/muse-spark-1.2-contributor-free',
+    name: 'Muse Spark 1.2 Contributor (Free)',
+  },
   { id: 'opencode/nemotron-3-ultra-free', name: 'Nemotron 3 Ultra (Free)' },
   {
     id: 'opencode/nemotron-3.5-lightning-free',
